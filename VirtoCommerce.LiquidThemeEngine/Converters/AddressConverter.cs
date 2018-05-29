@@ -1,4 +1,5 @@
-﻿using Omu.ValueInjecter;
+﻿using Microsoft.Practices.ServiceLocation;
+using Omu.ValueInjecter;
 using VirtoCommerce.LiquidThemeEngine.Objects;
 using StorefrontModel = VirtoCommerce.Storefront.Model;
 
@@ -7,6 +8,15 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
     public static class AddressConverter
     {
         public static Address ToShopifyModel(this StorefrontModel.Address address)
+        {
+            var converter = ServiceLocator.Current.GetInstance<ShopifyModelConverter>();
+            return converter.ToLiquidAddress(address);
+        }
+    }
+
+    public partial class ShopifyModelConverter
+    {
+        public virtual Address ToLiquidAddress(StorefrontModel.Address address)
         {
             Address result = null;
 
@@ -23,6 +33,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
                 result.ProvinceCode = address.RegionId;
                 result.Zip = address.PostalCode;
                 result.Country = address.CountryName;
+                result.Id = address.GetHashCode().ToString();
             }
 
             return result;

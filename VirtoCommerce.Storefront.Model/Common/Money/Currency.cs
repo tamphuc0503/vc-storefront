@@ -55,7 +55,9 @@ namespace VirtoCommerce.Storefront.Model.Common
 
         public string CultureName
         {
-            get { return _language.CultureName; }
+            get {
+                return _language != null ? _language.CultureName : null;
+            }
             set
             {
                 _language = new Language(value);
@@ -105,9 +107,15 @@ namespace VirtoCommerce.Storefront.Model.Common
         {
             foreach (var ci in CultureInfo.GetCultures(CultureTypes.SpecificCultures))
             {
-                var ri = new RegionInfo(ci.LCID);
-                if (ri.ISOCurrencySymbol == isoCode)
-                    return ri.CurrencySymbol;
+                try
+                {
+                    var ri = new RegionInfo(ci.LCID);
+                    if (ri.ISOCurrencySymbol == isoCode)
+                        return ri.CurrencySymbol;
+                }
+                catch(Exception)
+                {
+                }
             }
             return null;
         }

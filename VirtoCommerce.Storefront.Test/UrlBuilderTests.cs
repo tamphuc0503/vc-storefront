@@ -5,6 +5,7 @@ using VirtoCommerce.Storefront.Common;
 using VirtoCommerce.Storefront.Model;
 using VirtoCommerce.Storefront.Model.Common;
 using VirtoCommerce.Storefront.Model.Stores;
+using VirtoCommerce.Tools;
 using Xunit;
 
 namespace VirtoCommerce.Storefront.Test
@@ -36,7 +37,14 @@ namespace VirtoCommerce.Storefront.Test
             _workContext.CurrentStore = _workContext.AllStores.First();
             _workContext.CurrentLanguage = _workContext.CurrentStore.Languages.First();
 
-            _builder = new StorefrontUrlBuilder(_workContext);
+            _builder = new StorefrontUrlBuilder(new UrlBuilder(), _workContext);
+        }
+
+        [Fact]
+        public void When_VirtualPathIsNull_Expect_Null()
+        {
+            var result = _builder.ToAppAbsolute(null, null, null);
+            Assert.Null(result);
         }
 
         [Fact]
@@ -117,7 +125,7 @@ namespace VirtoCommerce.Storefront.Test
             _workContext.CurrentStore = _workContext.AllStores.First();
             _workContext.CurrentLanguage = _workContext.CurrentStore.Languages.First();
 
-            _builder = new StorefrontUrlBuilder(_workContext);
+            _builder = new StorefrontUrlBuilder(new UrlBuilder(), _workContext);
         }
 
         [Fact]
@@ -205,7 +213,7 @@ namespace VirtoCommerce.Storefront.Test
             _workContext.CurrentStore = _workContext.AllStores.First();
             _workContext.CurrentLanguage = _workContext.CurrentStore.Languages.First();
 
-            _builder = new StorefrontUrlBuilder(_workContext);
+            _builder = new StorefrontUrlBuilder(new UrlBuilder(), _workContext);
         }
 
         [Fact]
@@ -307,7 +315,7 @@ namespace VirtoCommerce.Storefront.Test
             _workContext.CurrentStore = _workContext.AllStores.First();
             _workContext.CurrentLanguage = _workContext.CurrentStore.Languages.First();
 
-            _builder = new StorefrontUrlBuilder(_workContext);
+            _builder = new StorefrontUrlBuilder(new UrlBuilder(), _workContext);
         }
 
         [Fact]
@@ -422,7 +430,7 @@ namespace VirtoCommerce.Storefront.Test
             _workContext.CurrentStore = _workContext.AllStores.First();
             _workContext.CurrentLanguage = _workContext.CurrentStore.Languages.First();
 
-            _builder = new StorefrontUrlBuilder(_workContext);
+            _builder = new StorefrontUrlBuilder(new UrlBuilder(), _workContext);
         }
 
         [Fact]
@@ -537,7 +545,7 @@ namespace VirtoCommerce.Storefront.Test
             _workContext.CurrentStore = _workContext.AllStores.First();
             _workContext.CurrentLanguage = _workContext.CurrentStore.Languages.First();
 
-            _builder = new StorefrontUrlBuilder(_workContext);
+            _builder = new StorefrontUrlBuilder(new UrlBuilder(), _workContext);
         }
 
         [Fact]
@@ -641,7 +649,7 @@ namespace VirtoCommerce.Storefront.Test
             _workContext.CurrentStore = _workContext.AllStores.First();
             _workContext.CurrentLanguage = _workContext.CurrentStore.Languages.First();
 
-            _builder = new StorefrontUrlBuilder(_workContext);
+            _builder = new StorefrontUrlBuilder(new UrlBuilder(), _workContext);
         }
 
         [Fact]
@@ -710,7 +718,7 @@ namespace VirtoCommerce.Storefront.Test
             _workContext.CurrentStore = _workContext.AllStores.First();
             _workContext.CurrentLanguage = _workContext.CurrentStore.Languages.First();
 
-            _builder = new StorefrontUrlBuilder(_workContext);
+            _builder = new StorefrontUrlBuilder(new UrlBuilder(), _workContext);
         }
 
         [Fact]

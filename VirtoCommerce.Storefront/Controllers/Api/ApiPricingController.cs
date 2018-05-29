@@ -37,12 +37,8 @@ namespace VirtoCommerce.Storefront.Controllers.Api
             if (products != null)
             {
                 //Evaluate products prices
-                await _pricingService.EvaluateProductPricesAsync(products);
-                //Evaluate discounts
-                var promotionContext = WorkContext.ToPromotionEvaluationContext(products);
-                promotionContext.PromoEntries = products.Select(x => x.ToPromotionItem()).ToList();
-
-                await _promotionEvaluator.EvaluateDiscountsAsync(promotionContext, products);
+                await _pricingService.EvaluateProductPricesAsync(products, WorkContext);
+              
                 var retVal = products.Select(x => x.Price).ToArray();
 
                 return Json(retVal);

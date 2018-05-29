@@ -9,16 +9,34 @@ namespace VirtoCommerce.Storefront.Model.Order
     /// <summary>
     /// Represent customer order
     /// </summary>
-    public class CustomerOrder
+    public partial class CustomerOrder
     {
-        public CustomerOrder()
+        public CustomerOrder(Currency currency)
         {
             Addresses = new List<Address>();
             InPayments = new List<PaymentIn>();
             Items = new List<LineItem>();
             TaxDetails = new List<TaxDetail>();
-            ChildrenOperations = new List<Operation>();
             DynamicProperties = new List<DynamicProperty>();
+            Currency = currency;
+            Total = new Money(currency);
+            SubTotal = new Money(currency);
+            SubTotalWithTax = new Money(currency);
+            DiscountTotal = new Money(currency);
+            DiscountTotalWithTax = new Money(currency);
+            ShippingTotal = new Money(currency);
+            ShippingTotalWithTax = new Money(currency);
+            TaxTotal = new Money(currency);
+            Discounts = new List<Discount>();
+            ShippingTaxTotal = new Money(currency);
+            ShippingDiscountTotal = new Money(currency);
+            ShippingDiscountTotalWithTax = new Money(currency);
+            SubTotalTaxTotal = new Money(currency);
+            SubTotalDiscount = new Money(currency);
+            SubTotalDiscountWithTax = new Money(currency);
+            DiscountAmount = new Money(currency);
+            DiscountAmountWithTax = new Money(currency);
+
         }
 
         /// <summary>
@@ -69,12 +87,6 @@ namespace VirtoCommerce.Storefront.Model.Order
         public string EmployeeId { get; set; }
 
         /// <summary>
-        /// Gets or Sets DiscountAmount
-        /// </summary>
-        public Money DiscountAmount { get; set; }
-
-
-        /// <summary>
         /// All shipping and billing order addresses
         /// </summary>
         /// <value>All shipping and billing order addresses</value>
@@ -111,18 +123,6 @@ namespace VirtoCommerce.Storefront.Model.Order
         public ICollection<TaxDetail> TaxDetails { get; set; }
 
         /// <summary>
-        /// Security permission scopes used for security check on UI
-        /// </summary>
-        /// <value>Security permission scopes used for security check on UI</value>
-        public ICollection<string> Scopes { get; set; }
-
-        /// <summary>
-        /// Operation type string representation (CustomerOrder, Shipment etc)
-        /// </summary>
-        /// <value>Operation type string representation (CustomerOrder, Shipment etc)</value>
-        public string OperationType { get; set; }
-
-        /// <summary>
         /// Unique user friendly document number (generate automatically based on special algorithm realization)
         /// </summary>
         /// <value>Unique user friendly document number (generate automatically based on special algorithm realization)</value>
@@ -146,29 +146,11 @@ namespace VirtoCommerce.Storefront.Model.Order
         public string Comment { get; set; }
 
         /// <summary>
-        /// Currecy code
+        /// Currency code
         /// </summary>
-        /// <value>Currecy code</value>
+        /// <value>Currency code</value>
         public Currency Currency { get; set; }
-
-        /// <summary>
-        /// Gets or Sets TaxIncluded
-        /// </summary>
-        public bool? TaxIncluded { get; set; }
-
-        /// <summary>
-        /// Money amount without tax
-        /// </summary>
-        /// <value>Money amount without tax</value>
-        public Money Sum { get; set; }
-
-        /// <summary>
-        /// Tax total
-        /// </summary>
-        /// <value>Tax total</value>
-        public Money Tax { get; set; }
-
-
+     
         /// <summary>
         /// Gets or Sets IsCancelled
         /// </summary>
@@ -183,23 +165,6 @@ namespace VirtoCommerce.Storefront.Model.Order
         /// Gets or Sets CancelReason
         /// </summary>
         public string CancelReason { get; set; }
-
-        /// <summary>
-        /// Used for construct hierarchy of operation and represent parent operation id
-        /// </summary>
-        /// <value>Used for construct hierarchy of operation and represent parent operation id</value>
-        public string ParentOperationId { get; set; }
-
-        /// <summary>
-        /// Gets or Sets ChildrenOperations
-        /// </summary>
-        public ICollection<Operation> ChildrenOperations { get; set; }
-
-        /// <summary>
-        /// Used for dynamic properties management, contains object type string
-        /// </summary>
-        /// <value>Used for dynamic properties management, contains object type string</value>
-        public string ObjectType { get; set; }
 
         /// <summary>
         /// Dynamic properties collections
@@ -232,17 +197,39 @@ namespace VirtoCommerce.Storefront.Model.Order
         /// </summary>
         public string Id { get; set; }
 
-        /// <summary>
-        /// Gets the value of order subtotal
-        /// </summary>
-        public Money SubTotal
-        {
-            get
-            {
-                var subtotal = Items.Sum(i => i.Price.Amount * i.Quantity.Value);
-                return new Money(subtotal, Currency);
-            }
-        }    
+        public ICollection<Discount> Discounts { get; set; }
+
+        public Money Total { get; set; }
+
+        public Money DiscountAmount { get; set; }
+        public Money DiscountAmountWithTax { get; set; }
+
+        public Money SubTotal { get; set; }
+        public Money SubTotalWithTax { get; set; }
+
+        public Money ShippingTotal { get; set; }
+        public Money ShippingTotalWithTax { get; set; }
+        public Money ShippingTaxTotal { get; set; }
+        public Money ShippingPrice { get; set; }
+        public Money ShippingPriceWithTax { get; set; }
+
+        public Money PaymentTotal { get; set; }
+        public Money PaymentTotalWithTax { get; set; }
+        public Money PaymentPrice { get; set; }
+        public Money PaymentPriceWithTax { get; set; }
+        public Money PaymentDiscountTotal { get; set; }
+        public Money PaymentDiscountTotalWithTax { get; set; }
+        public Money PaymentTaxTotal { get; set; }
+
+        public Money DiscountTotal { get; set; }
+        public Money DiscountTotalWithTax { get; set; }
+        public Money TaxTotal { get; set; }
+        public Money ShippingDiscountTotalWithTax { get; set; }
+        public Money ShippingDiscountTotal { get; set; }
+        public Money SubTotalTaxTotal { get; set; }
+        public Money SubTotalDiscount { get; set; }
+        public Money SubTotalDiscountWithTax { get; set; }
+        public string SubscriptionNumber { get; set; }
 
     }
 }

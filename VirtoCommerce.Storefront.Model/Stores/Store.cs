@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using VirtoCommerce.Storefront.Model.Common;
+using VirtoCommerce.Storefront.Model.Inventory;
 
 namespace VirtoCommerce.Storefront.Model.Stores
 {
     /// <summary>
     /// Represent store - main ecommerce aggregate unit
     /// </summary>
-    public class Store : Entity, IHasSettings
+    public partial class Store : Entity, IHasSettings
     {
         public Store()
         {
@@ -17,6 +18,7 @@ namespace VirtoCommerce.Storefront.Model.Stores
             SeoInfos = new List<SeoInfo>();
             DynamicProperties = new List<DynamicProperty>();
             Settings = new List<SettingEntry>();
+            FulfilmentCenters = new List<FulfillmentCenter>();
         }
 
         public string Name { get; set; }
@@ -100,11 +102,37 @@ namespace VirtoCommerce.Storefront.Model.Stores
         /// </summary>
         public ICollection<string> TrustedGroups { get; set; }
 
+        /// <summary>
+        /// Primary  fullfilment center
+        /// </summary>
+        public FulfillmentCenter PrimaryFullfilmentCenter { get; set; }
+
+        /// <summary>
+        /// All fullfilment centeres
+        /// </summary>
+        public ICollection<FulfillmentCenter> FulfilmentCenters { get; set; }
+
         public bool QuotesEnabled
         {
             get
             {
                 return Settings.GetSettingValue("Quotes.EnableQuotes", false);
+            }
+        }
+
+        public bool SubscriptionEnabled
+        {
+            get
+            {
+                return Settings.GetSettingValue("Subscription.EnableSubscriptions", false);
+            }
+        }
+
+        public bool TaxCalculationEnabled
+        {
+            get
+            {
+                return Settings.GetSettingValue("Stores.TaxCalculationEnabled", true);
             }
         }
 

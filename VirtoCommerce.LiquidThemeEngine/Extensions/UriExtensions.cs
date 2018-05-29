@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Web;
 
 namespace VirtoCommerce.LiquidThemeEngine.Extensions
@@ -14,23 +15,23 @@ namespace VirtoCommerce.LiquidThemeEngine.Extensions
         /// <returns>Url with given parameter value.</returns>
         public static Uri SetQueryParameter(this Uri url, string name, string value)
         {
-            var query = HttpUtility.ParseQueryString(url.Query);
+            var qs = HttpUtility.ParseQueryString(url.Query);
 
             if (value != null)
             {
-                query[name] = value;
+                qs[name] = value;
             }
             else
             {
-                query.Remove(name);
+                qs.Remove(name);
             }
 
-            var uriBuilder = new UriBuilder(url)
+            var result = new UriBuilder(url)
             {
-                Query = query.HasKeys() ? query.ToString() : string.Empty
+                Query = string.Join("&", qs.AllKeys.Select(key => string.Join("=", HttpUtility.UrlEncode(key), HttpUtility.UrlEncode(qs[key]))))
             };
 
-            return uriBuilder.Uri;
+            return result.Uri;
         }
     }
 }

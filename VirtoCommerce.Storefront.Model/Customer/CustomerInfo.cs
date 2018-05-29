@@ -4,13 +4,14 @@ using System.Runtime.Serialization;
 using VirtoCommerce.Storefront.Model.Common;
 using VirtoCommerce.Storefront.Model.Order;
 using VirtoCommerce.Storefront.Model.Quote;
+using VirtoCommerce.Storefront.Model.Subscriptions;
 
 namespace VirtoCommerce.Storefront.Model.Customer
 {
     /// <summary>
     /// Represent customer information structure 
     /// </summary>
-    public class CustomerInfo : Entity
+    public partial class CustomerInfo : Entity
     {
         public CustomerInfo()
         {
@@ -78,6 +79,8 @@ namespace VirtoCommerce.Storefront.Model.Customer
         public IMutablePagedList<CustomerOrder> Orders { get; set; }
         [IgnoreDataMember]
         public IMutablePagedList<QuoteRequest> QuoteRequests { get; set; }
+        [IgnoreDataMember]
+        public IMutablePagedList<Subscription> Subscriptions { get; set; }
 
         /// <summary>
         /// The user ID of an operator who has loggen in on behalf of a customer
@@ -92,6 +95,16 @@ namespace VirtoCommerce.Storefront.Model.Customer
         /// List of stores which user can sign in
         /// </summary>
         public IEnumerable<string> AllowedStores { get; set; }
+
+        /// <summary>
+        /// User groups such as VIP, Wholesaler etc
+        /// </summary>
+        public IEnumerable<string> UserGroups { get; set; }
+
+        /// <summary>
+        /// Entity type of customer
+        /// </summary>
+        public string MemberType { get; set; }
 
         public override string ToString()
         {

@@ -4,10 +4,11 @@ using System.Globalization;
 using System.Linq;
 using VirtoCommerce.Storefront.Model.Common;
 using VirtoCommerce.Storefront.Model.Marketing;
+using VirtoCommerce.Storefront.Model.Subscriptions;
 
 namespace VirtoCommerce.Storefront.Model.Catalog
 {
-    public class Product : Entity, IDiscountable, ITaxable
+    public partial class Product : Entity, IDiscountable, ITaxable
     {
         public Product()
         {
@@ -27,8 +28,7 @@ namespace VirtoCommerce.Storefront.Model.Catalog
             : this()
         {
             Currency = currency;
-            TaxTotal = new Money(currency);
-
+            Price = new ProductPrice(currency);
         }
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace VirtoCommerce.Storefront.Model.Catalog
         public string CategoryId { get; set; }
 
         /// <summary>
-        /// All parent categories ids concatenated with ";". E.g. (1;21;344)
+        /// All parent categories ids concatenated with "/". E.g. (1/21/344)
         /// </summary>
         public string Outline { get; set; }
 
@@ -143,7 +143,7 @@ namespace VirtoCommerce.Storefront.Model.Catalog
         /// <summary>
         /// Indicating whether this product can be reviewed in storefront
         /// </summary>
-        public decimal EnableReview { get; set; }
+        public bool EnableReview { get; set; }
 
         /// <summary>
         /// Maximum number of downloads of product (for digital product only)
@@ -163,7 +163,7 @@ namespace VirtoCommerce.Storefront.Model.Catalog
         /// <summary>
         /// Indicating whether this product has user agreement (for digital product only)
         /// </summary>
-        public decimal HasUserAgreement { get; set; }
+        public bool HasUserAgreement { get; set; }
 
         /// <summary>
         /// Type of product shipping
@@ -218,9 +218,14 @@ namespace VirtoCommerce.Storefront.Model.Catalog
         public ICollection<ProductPrice> Prices { get; set; }
 
         /// <summary>
-        /// Inventory info
+        /// Inventory for default fulfilment center
         /// </summary>
         public Inventory Inventory { get; set; }
+
+        /// <summary>
+        /// Inventory of all fulfillment centers.
+        /// </summary>
+        public ICollection<Inventory> InventoryAll { get; set; }
 
         /// <summary>
         /// product seo info
@@ -244,6 +249,13 @@ namespace VirtoCommerce.Storefront.Model.Catalog
                 return true;
             }
         }
+
+        public bool IsAvailable { get; set; }
+
+        /// <summary>
+        /// if the product is sold by subscription only this property contains the recurrence plan
+        /// </summary>
+        public PaymentPlan PaymentPlan { get; set; }
 
         /// <summary>
         /// Apply prices to product
@@ -269,6 +281,15 @@ namespace VirtoCommerce.Storefront.Model.Catalog
                 //Add nominal price to product prices list 
                 Prices.Add(nominalPrice);
             }
+
+            ApplyPricesWithExchangeRates(allCurrencies);
+
+            //Set current product price for current currency
+            Price = Prices.FirstOrDefault(x => x.Currency == currentCurrency);
+        }
+
+        private void ApplyPricesWithExchangeRates(IEnumerable<Currency> allCurrencies)
+        {
             //Need add product price for all currencies (even if not returned from API need make it by currency exchange conversation)
             foreach (var currency in allCurrencies)
             {
@@ -285,8 +306,6 @@ namespace VirtoCommerce.Storefront.Model.Catalog
                     Prices.Add(price);
                 }
             }
-            //Set current product price for current currency
-            Price = Prices.FirstOrDefault(x => x.Currency == currentCurrency);
         }
 
         #region IHasProperties Members
@@ -298,7 +317,21 @@ namespace VirtoCommerce.Storefront.Model.Catalog
         /// <summary>
         /// Gets or sets the value of total shipping tax amount
         /// </summary>
-        public Money TaxTotal { get; set; }
+        public Money TaxTotal
+        {
+            get
+            {
+                return Price != null ? Price.TaxTotal : null;
+            }
+        }
+
+        public decimal TaxPercentRate
+        {
+            get
+            {
+                return Price != null ? Price.TaxPercentRate : 0m;
+            }
+        }
 
         /// <summary>
         /// Gets or sets the value of shipping tax type
@@ -315,35 +348,8 @@ namespace VirtoCommerce.Storefront.Model.Catalog
 
         public void ApplyTaxRates(IEnumerable<TaxRate> taxRates)
         {
-            Price.ListPriceWithTax = Price.ListPrice;
-            Price.SalePriceWithTax = Price.SalePrice;
-
-            TaxTotal = new Money(Currency);
-
-            // TaxLine.Id can be a composite string: id&extra_info
-            var productTaxRates = taxRates.Where(x => x.Line.Id.SplitIntoTuple('&').Item1 == Id).ToList();
-            if (productTaxRates.Any())
-            {
-                var listPriceRate = productTaxRates.First(x => x.Line.Id.SplitIntoTuple('&').Item2.EqualsInvariant("list"));
-                var salePriceRate = productTaxRates.FirstOrDefault(x => x.Line.Id.SplitIntoTuple('&').Item2.EqualsInvariant("sale"));
-                if (salePriceRate == null)
-                {
-                    salePriceRate = listPriceRate;
-                }
-                TaxTotal += salePriceRate.Rate;
-                Price.ListPriceWithTax = Price.ListPrice + listPriceRate.Rate;
-                Price.SalePriceWithTax = Price.SalePrice + salePriceRate.Rate;
-
-                //Apply tax for tier prices
-                foreach (var tierPrice in Price.TierPrices)
-                {
-                    if (tierPrice != null)
-                    {
-                        var tierPriceTaxRate = productTaxRates.FirstOrDefault(x => x.Line.Id.SplitIntoTuple('&').Item2.EqualsInvariant(tierPrice.Quantity.ToString()));
-                        tierPrice.Tax = tierPriceTaxRate.Rate;
-                    }
-                }
-            }
+            var productTaxRates = taxRates.Where(x => x.Line.Id != null && x.Line.Id.EqualsInvariant(Id ?? ""));
+            Price.ApplyTaxRates(productTaxRates);
         }
 
         #endregion
@@ -362,21 +368,27 @@ namespace VirtoCommerce.Storefront.Model.Catalog
             }
 
             Discounts.Clear();
+            Price.DiscountAmount = new Money(Math.Max(0, (Price.ListPrice - Price.SalePrice).Amount), Currency);
 
             foreach (var reward in productRewards)
             {
-                //Apply discount to main price
-                var discount = reward.ToDiscountModel(Price.SalePrice, Price.SalePriceWithTax);
+                //Initialize tier price discount amount by default values
+                var discount = reward.ToDiscountModel(Price.SalePrice);
+                foreach (var tierPrice in Price.TierPrices)
+                {
+                    tierPrice.DiscountAmount = new Money(Math.Max(0, (Price.ListPrice - tierPrice.Price).Amount), Currency);
+                }
 
                 if (reward.IsValid)
                 {
                     Discounts.Add(discount);
-                    Price.ActiveDiscount = discount;
+                    Price.DiscountAmount += discount.Amount;
+
                     //apply discount to tier prices
                     foreach (var tierPrice in Price.TierPrices)
                     {
-                        discount = reward.ToDiscountModel(tierPrice.Price, tierPrice.PriceWithTax);
-                        tierPrice.ActiveDiscount = discount;
+                        discount = reward.ToDiscountModel(tierPrice.Price);
+                        tierPrice.DiscountAmount += discount.Amount;
                     }
                 }
             }

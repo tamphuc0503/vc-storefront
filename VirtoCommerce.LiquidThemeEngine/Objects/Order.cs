@@ -11,7 +11,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Objects
     /// https://docs.shopify.com/themes/liquid-documentation/objects/order
     /// </remarks>
     [DataContract]
-    public class Order : Drop
+    public partial class Order : Drop
     {
         /// <summary>
         /// Returns the billing address of the order.
@@ -49,6 +49,12 @@ namespace VirtoCommerce.LiquidThemeEngine.Objects
         /// </summary>
         [DataMember]
         public DateTime CreatedAt { get; set; }
+
+        /// <summary>
+        /// Returns the Currency code.
+        /// </summary>
+        [DataMember]
+        public string CurrencyCode { get; set; }
 
         /// <summary>
         /// Returns the customer associated with the order.

@@ -1,11 +1,10 @@
-﻿using Markdig;
-using Markdig.Renderers;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Markdig;
 using VirtoCommerce.LiquidThemeEngine;
 using VirtoCommerce.LiquidThemeEngine.Converters;
 using VirtoCommerce.Storefront.Model;
@@ -14,6 +13,7 @@ using VirtoCommerce.Storefront.Model.Services;
 using VirtoCommerce.Storefront.Model.StaticContent;
 using VirtoCommerce.Storefront.Model.StaticContent.Services;
 using VirtoCommerce.Storefront.Model.Stores;
+using VirtoCommerce.Tools;
 using YamlDotNet.RepresentationModel;
 
 namespace VirtoCommerce.Storefront.Services
@@ -26,7 +26,6 @@ namespace VirtoCommerce.Storefront.Services
         private static readonly Regex _headerRegExp = new Regex(@"(?s:^---(.*?)---)");
         private static readonly string[] _extensions = { ".md", ".html" };
         private readonly ILiquidThemeEngine _liquidEngine;
-        private readonly ILocalCacheManager _cacheManager;
         private readonly Func<WorkContext> _workContextFactory;
         private readonly Func<IStorefrontUrlBuilder> _urlBuilderFactory;
         private readonly Func<string, ContentItem> _contentItemFactory;
@@ -40,8 +39,7 @@ namespace VirtoCommerce.Storefront.Services
                                         IStaticContentBlobProvider contentBlobProvider)
         {
             _liquidEngine = liquidEngine;
-            
-            _cacheManager = cacheManager;
+
             _workContextFactory = workContextFactory;
             _urlBuilderFactory = urlBuilderFactory;
             _contentItemFactory = contentItemFactory;
@@ -50,11 +48,11 @@ namespace VirtoCommerce.Storefront.Services
             //Observe content changes to invalidate cache if changes occur
             _contentBlobProvider.Changed += (sender, args) =>
             {
-                _cacheManager.Clear();
+                cacheManager.Clear();
             };
             _contentBlobProvider.Renamed += (sender, args) =>
             {
-                _cacheManager.Clear();
+                cacheManager.Clear();
             };
 
             _markdownPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
@@ -66,7 +64,7 @@ namespace VirtoCommerce.Storefront.Services
         {
             var retVal = new List<ContentItem>();
             var baseStoreContentPath = "/" + store.Id;
-            var searchPattern = "*.*";
+            const string searchPattern = "*.*";
 
             if (_contentBlobProvider.PathExists(baseStoreContentPath))
             {
@@ -74,7 +72,7 @@ namespace VirtoCommerce.Storefront.Services
 
                 //Search files by requested search pattern
                 var contentBlobs = _contentBlobProvider.Search(baseStoreContentPath, searchPattern, true)
-                                             .Where(x => _extensions.Any(y => x.EndsWith(y)))
+                                             .Where(x => _extensions.Any(x.EndsWith))
                                              .Select(x => x.Replace("\\\\", "\\"));
 
                 //each content file  has a name pattern {name}.{language?}.{ext}
@@ -114,24 +112,28 @@ namespace VirtoCommerce.Storefront.Services
                 //Load raw content with metadata
                 content = stream.ReadToString();
             }
+
             IDictionary<string, IEnumerable<string>> metaHeaders;
-            IDictionary themeSettings = null;
+            string error = null;
+
             try
             {
                 metaHeaders = ReadYamlHeader(content);
             }
             catch (Exception ex)
             {
-                throw new ApplicationException(string.Format("Failed to read yaml header from \"{0}\"", contentItem.StoragePath), ex);
+                error = $"Failed to parse YAML header from \"{contentItem.StoragePath}\"<br/>{ex.Message}";
+                metaHeaders = new Dictionary<string, IEnumerable<string>>();
             }
 
             content = RemoveYamlHeader(content);
 
+            IDictionary themeSettings = null;
             var workContext = _workContextFactory();
             if (workContext != null)
             {
                 var shopifyContext = workContext.ToShopifyModel(_urlBuilderFactory());
-                var parameters = shopifyContext.ToLiquid() as Dictionary<string, object>;
+                var parameters = (Dictionary<string, object>)shopifyContext.ToLiquid();
 
                 themeSettings = _liquidEngine.GetSettings();
                 parameters.Add("settings", themeSettings);
@@ -140,12 +142,42 @@ namespace VirtoCommerce.Storefront.Services
             }
 
             //Render markdown content
-            if (string.Equals(Path.GetExtension(contentItem.StoragePath), ".md", StringComparison.InvariantCultureIgnoreCase))
+            if (Path.GetExtension(contentItem.StoragePath).EqualsInvariant(".md"))
             {
                 content = Markdown.ToHtml(content, _markdownPipeline);
             }
 
-            contentItem.LoadContent(content, metaHeaders, themeSettings);
+            if (!string.IsNullOrEmpty(error))
+            {
+                content = $"{error}<br/>{content}";
+            }
+
+            contentItem.LoadContent(content, metaHeaders);
+
+            //Try to get default permalink template from theme settings
+            if (string.IsNullOrEmpty(contentItem.Permalink))
+            {
+                contentItem.Permalink = ":folder/:categories/:title";
+                if (themeSettings != null)
+                {
+                    contentItem.Permalink = (string)themeSettings["permalink"] ?? contentItem.Permalink;
+                }
+            }
+            //Transform permalink template to url
+            contentItem.Url = GetContentItemUrl(contentItem, contentItem.Permalink);
+            //Transform aliases permalink templates to urls
+            contentItem.AliasesUrls = contentItem.Aliases.Select(x => GetContentItemUrl(contentItem, x)).ToList();
+        }
+
+        private static string GetContentItemUrl(ContentItem item, string permalink)
+        {
+            return new FrontMatterPermalink
+            {
+                UrlTemplate = permalink,
+                Categories = item.Categories,
+                Date = item.CreatedDate,
+                FilePath = item.StoragePath
+            }.ToUrl();
         }
 
         private static string RemoveYamlHeader(string text)
@@ -213,11 +245,13 @@ namespace VirtoCommerce.Storefront.Services
         {
             public LocalizedBlobInfo(string blobPath)
             {
-                Language = Language.InvariantLanguage;
                 Path = blobPath;
-                var parts = System.IO.Path.GetFileName(blobPath).Split('.');
-                Name = parts.FirstOrDefault();
-                if (parts.Count() == 3)
+                Language = Language.InvariantLanguage;
+
+                var parts = System.IO.Path.GetFileName(blobPath)?.Split('.');
+                Name = parts?.FirstOrDefault();
+
+                if (parts?.Length == 3)
                 {
                     try
                     {
@@ -229,9 +263,10 @@ namespace VirtoCommerce.Storefront.Services
                     }
                 }
             }
-            public string Name { get; private set; }
-            public Language Language { get; private set; }
-            public string Path { get; private set; }
+
+            public string Name { get; }
+            public Language Language { get; }
+            public string Path { get; }
         }
     }
 }

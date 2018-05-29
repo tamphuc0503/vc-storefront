@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using System.Web;
 using System.Web.Compilation;
 using System.Web.Hosting;
 using System.Web.Mvc;
+using System.Web.Optimization;
 using System.Web.Routing;
 using CacheManager.Core;
 using CacheManager.Web;
@@ -14,47 +15,59 @@ using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Owin;
 using Microsoft.Owin.Extensions;
 using Microsoft.Owin.Security;
+using Microsoft.Practices.ServiceLocation;
 using Microsoft.Practices.Unity;
 using Microsoft.Practices.Unity.Mvc;
 using Newtonsoft.Json;
 using NLog;
 using Owin;
-using VirtoCommerce.CartModule.Client.Api;
-using VirtoCommerce.CatalogModule.Client.Api;
-using VirtoCommerce.ContentModule.Client.Api;
-using VirtoCommerce.CoreModule.Client.Api;
-using VirtoCommerce.CustomerModule.Client.Api;
-using VirtoCommerce.InventoryModule.Client.Api;
 using VirtoCommerce.LiquidThemeEngine;
 using VirtoCommerce.LiquidThemeEngine.Binders;
-using VirtoCommerce.MarketingModule.Client.Api;
-using VirtoCommerce.OrderModule.Client.Api;
-using VirtoCommerce.Platform.Client.Api;
-using VirtoCommerce.Platform.Client.Security;
-using VirtoCommerce.PricingModule.Client.Api;
-using VirtoCommerce.QuoteModule.Client.Api;
-using VirtoCommerce.SearchModule.Client.Api;
 using VirtoCommerce.Storefront;
 using VirtoCommerce.Storefront.App_Start;
+using VirtoCommerce.Storefront.AutoRestClients.CacheModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.CartModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.CatalogModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.ContentModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.CoreModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.CustomerModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.InventoryModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.MarketingModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.OrdersModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.PlatformModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.PricingModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.ProductRecommendationsModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.QuoteModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.SitemapsModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.StoreModuleApi;
+using VirtoCommerce.Storefront.AutoRestClients.SubscriptionModuleApi;
+using VirtoCommerce.Storefront.BackgroundJobs;
+using VirtoCommerce.Storefront.Binders;
 using VirtoCommerce.Storefront.Builders;
 using VirtoCommerce.Storefront.Common;
 using VirtoCommerce.Storefront.Controllers;
 using VirtoCommerce.Storefront.Model;
 using VirtoCommerce.Storefront.Model.Cart.Services;
+using VirtoCommerce.Storefront.Model.Catalog.Services;
 using VirtoCommerce.Storefront.Model.Common;
 using VirtoCommerce.Storefront.Model.Common.Events;
 using VirtoCommerce.Storefront.Model.Customer.Services;
+using VirtoCommerce.Storefront.Model.Inventory.Services;
 using VirtoCommerce.Storefront.Model.LinkList.Services;
 using VirtoCommerce.Storefront.Model.Marketing.Services;
 using VirtoCommerce.Storefront.Model.Order.Events;
 using VirtoCommerce.Storefront.Model.Pricing.Services;
 using VirtoCommerce.Storefront.Model.Quote.Events;
 using VirtoCommerce.Storefront.Model.Quote.Services;
+using VirtoCommerce.Storefront.Model.Recommendations;
 using VirtoCommerce.Storefront.Model.Services;
 using VirtoCommerce.Storefront.Model.StaticContent.Services;
+using VirtoCommerce.Storefront.Model.Tax.Services;
 using VirtoCommerce.Storefront.Owin;
+using VirtoCommerce.Storefront.Routing;
 using VirtoCommerce.Storefront.Services;
-using VirtoCommerce.StoreModule.Client.Api;
+using VirtoCommerce.Storefront.Services.Recommendations;
+using VirtoCommerce.Tools;
 
 [assembly: OwinStartup(typeof(Startup))]
 [assembly: PreApplicationStartMethod(typeof(Startup), "PreApplicationStart")]
@@ -84,7 +97,8 @@ namespace VirtoCommerce.Storefront
 
         public void Configuration(IAppBuilder app)
         {
-            var applicationInsightsKey = ConfigurationManager.AppSettings.GetValue("ApplicationInsightsInstrumentationKey", string.Empty);
+            var applicationInsightsKey = Environment.GetEnvironmentVariable("APPINSIGHTS_INSTRUMENTATIONKEY");
+
             if (!string.IsNullOrEmpty(applicationInsightsKey))
             {
                 TelemetryConfiguration.Active.InstrumentationKey = applicationInsightsKey;
@@ -99,6 +113,12 @@ namespace VirtoCommerce.Storefront
             UnityWebActivator.Start();
             var container = UnityConfig.GetConfiguredContainer();
 
+            var locator = new UnityServiceLocator(container);
+            ServiceLocator.SetLocatorProvider(() => locator);
+
+            //Cure for System.Runtime.Caching.MemoryCache freezing 
+            //https://www.zpqrtbnk.net/posts/appdomains-threads-cultureinfos-and-paracetamol
+            app.SanitizeThreadCulture();
             // Caching configuration
             // Be cautious with SystemWebCacheHandle because it does not work in native threads (Hangfire jobs).
             var localCache = CacheFactory.FromConfiguration<object>("storefrontCache");
@@ -125,31 +145,31 @@ namespace VirtoCommerce.Storefront
             };
 
             var distributedCache = CacheFactory.Build("distributedCache", settings =>
-      {
-          var jsonSerializerSettings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
-          var redisCacheEnabled = ConfigurationManager.AppSettings.GetValue("VirtoCommerce:Storefront:RedisCache:Enabled", false);
+            {
+                var jsonSerializerSettings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
+                var redisCacheEnabled = ConfigurationHelper.GetAppSettingsValue("VirtoCommerce:Storefront:RedisCache:Enabled", false);
 
-          var memoryHandlePart = settings
-              .WithJsonSerializer(jsonSerializerSettings, jsonSerializerSettings)
-              .WithUpdateMode(CacheUpdateMode.Up)
-              .WithSystemRuntimeCacheHandle("memory")
-              .WithExpiration(ExpirationMode.Absolute, TimeSpan.FromHours(1));
+                var memoryHandlePart = settings
+                    .WithJsonSerializer(jsonSerializerSettings, jsonSerializerSettings)
+                    .WithUpdateMode(CacheUpdateMode.Up)
+                    .WithSystemRuntimeCacheHandle("memory")
+                    .WithExpiration(ExpirationMode.Absolute, TimeSpan.FromHours(1));
 
-          if (redisCacheEnabled)
-          {
-              var redisCacheConnectionStringName = ConfigurationManager.AppSettings.GetValue("VirtoCommerce:Storefront:RedisCache:ConnectionStringName", "RedisCache");
-              var redisConnectionString = ConfigurationManager.ConnectionStrings[redisCacheConnectionStringName].ConnectionString;
+                if (redisCacheEnabled)
+                {
+                    var redisCacheConnectionStringName = ConfigurationHelper.GetAppSettingsValue("VirtoCommerce:Storefront:RedisCache:ConnectionStringName", "RedisCache");
+                    var redisConnectionString = ConfigurationHelper.GetConnectionStringValue(redisCacheConnectionStringName);
 
-              memoryHandlePart
-                  .And
-                  .WithRedisConfiguration("redis", redisConnectionString)
-                  .WithRetryTimeout(100)
-                  .WithMaxRetries(1000)
-                  .WithRedisBackplane("redis")
-                  .WithRedisCacheHandle("redis", true)
-                  .WithExpiration(ExpirationMode.Absolute, TimeSpan.FromHours(1));
-          }
-      });
+                    memoryHandlePart
+                        .And
+                        .WithRedisConfiguration("redis", redisConnectionString)
+                        .WithRetryTimeout(100)
+                        .WithMaxRetries(1000)
+                        .WithRedisBackplane("redis")
+                        .WithRedisCacheHandle("redis", true)
+                        .WithExpiration(ExpirationMode.Absolute, TimeSpan.FromHours(1));
+                }
+            });
             var distributedCacheManager = new DistributedCacheManager(distributedCache);
             container.RegisterInstance<IDistributedCacheManager>(distributedCacheManager);
 
@@ -162,7 +182,7 @@ namespace VirtoCommerce.Storefront
             container.RegisterInstance(workContextFactory);
 
             // Workaround for old storefront base URL: remove /api/ suffix since it is already included in every resource address in VirtoCommerce.Client library.
-            var baseUrl = ConfigurationManager.ConnectionStrings["VirtoCommerceBaseUrl"].ConnectionString;
+            var baseUrl = ConfigurationHelper.GetConnectionStringValue("VirtoCommerceBaseUrl");
             if (baseUrl != null && baseUrl.EndsWith("/api/", StringComparison.OrdinalIgnoreCase))
             {
                 var apiPosition = baseUrl.LastIndexOf("/api/", StringComparison.OrdinalIgnoreCase);
@@ -172,39 +192,59 @@ namespace VirtoCommerce.Storefront
                 }
             }
 
-            var apiAppId = ConfigurationManager.AppSettings["vc-public-ApiAppId"];
-            var apiSecretKey = ConfigurationManager.AppSettings["vc-public-ApiSecretKey"];
-            var hmacHandler = new HmacRestRequestHandler(apiAppId, apiSecretKey);
-            var currentUserHandler = new CurrentUserRestRequestHandler(workContextFactory);
+            var apiAppId = ConfigurationHelper.GetAppSettingsValue("vc-public-ApiAppId");
+            var apiSecretKey = ConfigurationHelper.GetAppSettingsValue("vc-public-ApiSecretKey");
+            container.RegisterInstance(new HmacCredentials(apiAppId, apiSecretKey));
 
-            container.RegisterInstance<IVirtoCommerceCartApi>(new VirtoCommerceCartApi(new CartModule.Client.Client.ApiClient(baseUrl, new CartModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceCatalogApi>(new VirtoCommerceCatalogApi(new CatalogModule.Client.Client.ApiClient(baseUrl, new CatalogModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceContentApi>(new VirtoCommerceContentApi(new ContentModule.Client.Client.ApiClient(baseUrl, new ContentModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceCoreApi>(new VirtoCommerceCoreApi(new CoreModule.Client.Client.ApiClient(baseUrl, new CoreModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceCustomerApi>(new VirtoCommerceCustomerApi(new CustomerModule.Client.Client.ApiClient(baseUrl, new CustomerModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceInventoryApi>(new VirtoCommerceInventoryApi(new InventoryModule.Client.Client.ApiClient(baseUrl, new InventoryModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceMarketingApi>(new VirtoCommerceMarketingApi(new MarketingModule.Client.Client.ApiClient(baseUrl, new MarketingModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommercePlatformApi>(new VirtoCommercePlatformApi(new Platform.Client.Client.ApiClient(baseUrl, new Platform.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommercePricingApi>(new VirtoCommercePricingApi(new PricingModule.Client.Client.ApiClient(baseUrl, new PricingModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceOrdersApi>(new VirtoCommerceOrdersApi(new OrderModule.Client.Client.ApiClient(baseUrl, new OrderModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceQuoteApi>(new VirtoCommerceQuoteApi(new QuoteModule.Client.Client.ApiClient(baseUrl, new QuoteModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceSearchApi>(new VirtoCommerceSearchApi(new SearchModule.Client.Client.ApiClient(baseUrl, new SearchModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
-            container.RegisterInstance<IVirtoCommerceStoreApi>(new VirtoCommerceStoreApi(new StoreModule.Client.Client.ApiClient(baseUrl, new StoreModule.Client.Client.Configuration(), hmacHandler.PrepareRequest, currentUserHandler.PrepareRequest)));
+            container.RegisterType<VirtoCommerceApiRequestHandler>(new PerRequestLifetimeManager());
+
+            ServicePointManager.UseNagleAlgorithm = false;
+
+            container.RegisterType<System.Net.Http.HttpClientHandler>(new InjectionFactory(c => new System.Net.Http.HttpClientHandler
+            {
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+            }));
+
+            //Timeout for all API requests. Should be small on production to prevent platform API flood.
+            var apiRequestTimeout = TimeSpan.Parse(ConfigurationHelper.GetAppSettingsValue("VirtoCommerce:Storefront:ApiRequest:Timeout", "0:0:30"));
+
+            var baseUri = new Uri(baseUrl);
+            container.RegisterType<ICacheModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new CacheModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<ICartModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new CartModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<ICatalogModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new CatalogModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<IContentModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new ContentModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<ICoreModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new CoreModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<ICustomerModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new CustomerModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<IInventoryModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new InventoryModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<IMarketingModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new MarketingModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<IOrdersModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new OrdersModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<IPlatformModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new PlatformModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<IPricingModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new PricingModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<IQuoteModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new QuoteModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<ISitemapsModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new SitemapsModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<IStoreModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new StoreModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<ISubscriptionModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new SubscriptionModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).DisableRetries().WithTimeout(apiRequestTimeout)));
+            container.RegisterType<IProductRecommendationsModuleApiClient>(new PerRequestLifetimeManager(), new InjectionFactory(c => new ProductRecommendationsModuleApiClient(baseUri, c.Resolve<VirtoCommerceApiRequestHandler>(), c.Resolve<System.Net.Http.HttpClientHandler>()).WithTimeout(apiRequestTimeout)));
 
             container.RegisterType<IMarketingService, MarketingServiceImpl>();
             container.RegisterType<IPromotionEvaluator, PromotionEvaluator>();
-            container.RegisterType<ICartValidator, CartValidator>();
+            container.RegisterType<ITaxEvaluator, TaxEvaluator>();
             container.RegisterType<IPricingService, PricingServiceImpl>();
             container.RegisterType<ICustomerService, CustomerServiceImpl>();
             container.RegisterType<IMenuLinkListService, MenuLinkListServiceImpl>();
+            container.RegisterType<ISeoRouteService, SeoRouteService>();
+            container.RegisterType<IProductAvailabilityService, ProductAvailabilityService>();
+            container.RegisterType<IInventoryService, InventoryServiceImpl>();
 
             container.RegisterType<ICartBuilder, CartBuilder>();
             container.RegisterType<IQuoteRequestBuilder, QuoteRequestBuilder>();
             container.RegisterType<ICatalogSearchService, CatalogSearchServiceImpl>();
             container.RegisterType<IAuthenticationManager>(new InjectionFactory(context => HttpContext.Current.GetOwinContext().Authentication));
-
-
+            container.RegisterType<IUrlBuilder, UrlBuilder>();
             container.RegisterType<IStorefrontUrlBuilder, StorefrontUrlBuilder>(new PerRequestLifetimeManager());
+
+            container.RegisterType<IRecommendationsService, CognitiveRecommendationsService>("Cognitive");
+            container.RegisterType<IRecommendationsService, AssociationRecommendationsService>("Association");
 
             //Register domain events
             container.RegisterType<IEventPublisher<OrderPlacedEvent>, EventPublisher<OrderPlacedEvent>>();
@@ -216,12 +256,9 @@ namespace VirtoCommerce.Storefront
             container.RegisterType<IAsyncObserver<UserLoginEvent>, CartBuilder>("Merge anonymous cart with loggined user cart");
             container.RegisterType<IAsyncObserver<UserLoginEvent>, QuoteRequestBuilder>("Merge anonymous quote request with loggined user quote");
 
-
-            var cmsContentConnectionString = BlobConnectionString.Parse(ConfigurationManager.ConnectionStrings["ContentConnectionString"].ConnectionString);
+            var cmsContentConnectionString = BlobConnectionString.Parse(ConfigurationHelper.GetConnectionStringValue("ContentConnectionString"));
             var themesBasePath = cmsContentConnectionString.RootPath.TrimEnd('/') + "/" + "Themes";
             var staticContentBasePath = cmsContentConnectionString.RootPath.TrimEnd('/') + "/" + "Pages";
-            //Use always file system provider for global theme
-            var globalThemesBlobProvider = new FileSystemContentBlobProvider(ResolveLocalPath("~/App_Data/Themes/default"));
             IContentBlobProvider themesBlobProvider;
             IStaticContentBlobProvider staticContentBlobProvider;
             if ("AzureBlobStorage".Equals(cmsContentConnectionString.Provider, StringComparison.OrdinalIgnoreCase))
@@ -234,9 +271,9 @@ namespace VirtoCommerce.Storefront
                 themesBlobProvider = new FileSystemContentBlobProvider(ResolveLocalPath(themesBasePath));
                 staticContentBlobProvider = new FileSystemContentBlobProvider(ResolveLocalPath(staticContentBasePath));
             }
-            container.RegisterInstance<IStaticContentBlobProvider>(staticContentBlobProvider);
+            container.RegisterInstance(staticContentBlobProvider);
 
-            var shopifyLiquidEngine = new ShopifyLiquidThemeEngine(localCacheManager, workContextFactory, () => container.Resolve<IStorefrontUrlBuilder>(), themesBlobProvider, globalThemesBlobProvider, "~/themes/assets", "~/themes/global/assets");
+            var shopifyLiquidEngine = new ShopifyLiquidThemeEngine(localCacheManager, workContextFactory, () => container.Resolve<IStorefrontUrlBuilder>(), themesBlobProvider, "~/themes/assets");
             container.RegisterInstance<ILiquidThemeEngine>(shopifyLiquidEngine);
 
             //Register liquid engine
@@ -248,10 +285,25 @@ namespace VirtoCommerce.Storefront
             //Static content service
             var staticContentService = new StaticContentServiceImpl(shopifyLiquidEngine, localCacheManager, workContextFactory, () => container.Resolve<IStorefrontUrlBuilder>(), StaticContentItemFactory.GetContentItemFromPath, staticContentBlobProvider);
             container.RegisterInstance<IStaticContentService>(staticContentService);
+            //Register generate sitemap background job
+            container.RegisterType<GenerateSitemapJob>(new InjectionFactory(c => new GenerateSitemapJob(themesBlobProvider, c.Resolve<ISitemapsModuleApiClient>(), c.Resolve<IStorefrontUrlBuilder>())));
+
+            var changesTrackingEnabled = ConfigurationHelper.GetAppSettingsValue("VirtoCommerce:Storefront:ChangesTracking:Enabled", true);
+            var changesTrackingInterval = TimeSpan.Parse(ConfigurationHelper.GetAppSettingsValue("VirtoCommerce:Storefront:ChangesTracking:Interval", "0:1:0"));
+            var changesTrackingService = new ChangesTrackingService(changesTrackingEnabled, changesTrackingInterval, container.Resolve<ICacheModuleApiClient>());
+            container.RegisterInstance<IChangesTrackingService>(changesTrackingService);
+
+            app.Use<OriginalHostRewriterOwinMiddleware>(container);
 
             FilterConfig.RegisterGlobalFilters(GlobalFilters.Filters, workContextFactory, () => container.Resolve<CommonController>());
-            RouteConfig.RegisterRoutes(RouteTable.Routes, workContextFactory, container.Resolve<IVirtoCommerceCoreApi>(), container.Resolve<IStaticContentService>(), localCacheManager, () => container.Resolve<IStorefrontUrlBuilder>());
+            RouteConfig.RegisterRoutes(RouteTable.Routes, container.Resolve<ISeoRouteService>(), workContextFactory, () => container.Resolve<IStorefrontUrlBuilder>());
             AuthConfig.ConfigureAuth(app, () => container.Resolve<IStorefrontUrlBuilder>());
+
+            //This special binders need because all these types not contains default ctor and Money with Currency properties
+            ModelBinders.Binders.Add(typeof(Model.Cart.Shipment), new CartModelBinder<Model.Cart.Shipment>(workContextFactory));
+            ModelBinders.Binders.Add(typeof(Model.Cart.Payment), new CartModelBinder<Model.Cart.Payment>(workContextFactory));
+            ModelBinders.Binders.Add(typeof(Model.Order.PaymentIn), new OrderModelBinder<Model.Order.PaymentIn>(workContextFactory));
+            ModelBinders.Binders.Add(typeof(Model.Recommendations.RecommendationEvalContext), new ReccomendationsModelBinder<Model.Recommendations.RecommendationEvalContext>());
 
             app.Use<WorkContextOwinMiddleware>(container);
             app.UseStageMarker(PipelineStage.PostAuthorize);
@@ -270,7 +322,7 @@ namespace VirtoCommerce.Storefront
                 {
                     var classInstance = Activator.CreateInstance(type, null);
                     var parameters = new object[] { app, virtualRoot, routPrefix };
-                    var result = methodInfo.Invoke(classInstance, parameters);
+                    methodInfo.Invoke(classInstance, parameters);
                 }
             }
         }

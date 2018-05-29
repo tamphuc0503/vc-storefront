@@ -1,18 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Specialized;
 using VirtoCommerce.Storefront.Model.Common;
 
 namespace VirtoCommerce.Storefront.Model.Order
 {
-    public class OrderSearchCriteria : PagedSearchCriteria
+    public partial class OrderSearchCriteria : PagedSearchCriteria
     {
-        public OrderSearchCriteria(NameValueCollection queryString)
-            : base(queryString)
+        private static int _defaultPageSize = 20;
+
+        public static int DefaultPageSize
+        {
+            get { return _defaultPageSize; }
+            set { _defaultPageSize = value; }
+        }
+
+        public OrderSearchCriteria()
+            : base(new NameValueCollection(), _defaultPageSize)
         {
         }
+        public OrderSearchCriteria(NameValueCollection queryString)
+            : base(queryString, DefaultPageSize)
+        {
+        }
+
+        public string CustomerId { get; set; }
+        public string Sort { get; set; }
     }
 }
+

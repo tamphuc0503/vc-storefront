@@ -1,4 +1,6 @@
-﻿using VirtoCommerce.LiquidThemeEngine.Objects;
+﻿using Microsoft.Practices.ServiceLocation;
+using Omu.ValueInjecter;
+using VirtoCommerce.LiquidThemeEngine.Objects;
 using VirtoCommerce.Storefront.Model.Common;
 using StorefrontModel = VirtoCommerce.Storefront.Model;
 
@@ -6,69 +8,76 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
 {
     public static class LineItemConverter
     {
-        public static LineItem ToShopifyModel(this StorefrontModel.Cart.LineItem lineItem, StorefrontModel.WorkContext workContext)
+        public static LineItem ToShopifyModel(this StorefrontModel.Cart.LineItem lineItem, StorefrontModel.Language language, IStorefrontUrlBuilder urlBuilder)
         {
-            var shopifyModel = new LineItem();
+            var converter = ServiceLocator.Current.GetInstance<ShopifyModelConverter>();
+            return converter.ToLiquidLineItem(lineItem, language, urlBuilder);
+        }
+
+        public static LineItem ToShopifyModel(this StorefrontModel.Order.LineItem lineItem, StorefrontModel.Language language, IStorefrontUrlBuilder urlBuilder)
+        {
+            var converter = ServiceLocator.Current.GetInstance<ShopifyModelConverter>();
+            return converter.ToLiquidLineItem(lineItem, language, urlBuilder);
+        }
+    }
+
+    public partial class ShopifyModelConverter
+    {
+        public virtual LineItem ToLiquidLineItem(StorefrontModel.Cart.LineItem lineItem, StorefrontModel.Language language, IStorefrontUrlBuilder urlBuilder)
+        {
+            var result = new LineItem();
+
+            result.InjectFrom<StorefrontModel.Common.NullableAndEnumValueInjecter>(lineItem);
 
             //shopifyModel.Product = lineItem.Product.ToShopifyModel();
-            shopifyModel.Fulfillment = null; // TODO
-            shopifyModel.Grams = lineItem.Weight ?? 0m;
-            shopifyModel.Id = lineItem.Id;
-            shopifyModel.Image = new Image
+            result.Fulfillment = null; // TODO
+            result.Grams = lineItem.Weight ?? 0m;
+            result.Image = new Image
             {
                 Alt = lineItem.Name,
                 Name = lineItem.Name,
                 ProductId = lineItem.ProductId,
                 Src = lineItem.ImageUrl
             };
-            shopifyModel.LinePrice = lineItem.ExtendedPrice.Amount * 100;
-            shopifyModel.LinePriceWithTax = lineItem.ExtendedPriceWithTax.Amount * 100;
-            shopifyModel.Price = lineItem.PlacedPrice.Amount * 100;
-            shopifyModel.PriceWithTax = lineItem.PlacedPriceWithTax.Amount * 100;
-            shopifyModel.ProductId = lineItem.ProductId;
-            //shopifyModel.Properties = null; // TODO
-            shopifyModel.Quantity = lineItem.Quantity;
-            shopifyModel.RequiresShipping = lineItem.RequiredShipping;
-            shopifyModel.Sku = lineItem.Sku;
-            shopifyModel.Taxable = lineItem.TaxIncluded;
-            shopifyModel.Title = lineItem.Name;
-            shopifyModel.Type = null; // TODO
-            shopifyModel.Url = null; // TODO
-            shopifyModel.Variant = null; // TODO
-            shopifyModel.VariantId = lineItem.ProductId;
-            shopifyModel.Vendor = null; // TODO
+            result.LinePrice = lineItem.ExtendedPrice.Amount * 100;
+            result.LinePriceWithTax = lineItem.ExtendedPriceWithTax.Amount * 100;
+            result.Price = lineItem.PlacedPrice.Amount * 100;
+            result.PriceWithTax = lineItem.PlacedPriceWithTax.Amount * 100;
+            result.Title = lineItem.Name;
+            result.VariantId = lineItem.ProductId;
 
-            return shopifyModel;
+            result.Properties = new MetafieldsCollection("properties", language, lineItem.DynamicProperties);
+
+            return result;
         }
 
-        public static LineItem ToShopifyModel(this StorefrontModel.Order.LineItem lineItem, IStorefrontUrlBuilder urlBuilder)
+        public virtual LineItem ToLiquidLineItem(StorefrontModel.Order.LineItem lineItem, StorefrontModel.Language language, IStorefrontUrlBuilder urlBuilder)
         {
-            var result = new LineItem
+            var result = new LineItem();
+
+            result.InjectFrom<StorefrontModel.Common.NullableAndEnumValueInjecter>(lineItem);
+
+            result.Fulfillment = null; // TODO
+            result.Grams = lineItem.Weight ?? 0m;
+            result.Image = new Image
             {
-                Fulfillment = null,
-                Grams = lineItem.Weight ?? 0m,
-                Id = lineItem.Id,
-                Quantity = lineItem.Quantity ?? 0,
-                Price = lineItem.Price.Amount * 100,
-                PriceWithTax = lineItem.PriceWithTax.Amount * 100,
+                Alt = lineItem.Name,
+                Name = lineItem.Name,
                 ProductId = lineItem.ProductId,
-                Sku = lineItem.Name,
-                Title = lineItem.Name,
-                Url = urlBuilder.ToAppAbsolute("/product/" + lineItem.ProductId),
+                Src = lineItem.ImageUrl
             };
-
-            result.LinePrice = result.Price * result.Quantity;
-            result.LinePriceWithTax = result.PriceWithTax * result.Quantity;
-
+            result.LinePrice = lineItem.ExtendedPrice.Amount * 100;
+            result.LinePriceWithTax = lineItem.ExtendedPriceWithTax.Amount * 100;
+            result.Price = lineItem.PlacedPrice.Amount * 100;
+            result.PriceWithTax = lineItem.PlacedPriceWithTax.Amount * 100;
+            result.Title = lineItem.Name;
+            result.Type = lineItem.ObjectType; 
+            result.Url = urlBuilder.ToAppAbsolute("/product/" + lineItem.ProductId);
             result.Product = new Product
             {
                 Id = result.ProductId,
                 Url = result.Url
-            };
-
-            //result.Image = lineItem.Product.PrimaryImage != null ? lineItem.Product.PrimaryImage.ToShopifyModel() : null;
-            //result.RequiresShipping = lineItem.RequiredShipping;
-            //result.Taxable = lineItem.TaxIncluded;
+            };       
 
             return result;
         }

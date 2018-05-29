@@ -15,8 +15,22 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
         /// {{ 145 | money }}
         /// </summary>
         /// <param name="input"></param>
+        /// <param name="currencyCode"></param>
         /// <returns></returns>
-        public static string Money(object input)
+        public static string Money(object input, string currencyCode = null)
+        {
+            var money = GetMoney(input, currencyCode);
+            return money == null ? null : money.ToString();
+        }
+
+        public static string MoneyWithoutDecimalPart(object input, string currencyCode = null)
+        {
+            var money = GetMoney(input, currencyCode);
+            return money == null ? null : money.FormattedAmountWithoutPoint;
+        }
+
+
+        private static Money GetMoney(object input, string currencyCode = null)
         {
             if (input == null)
             {
@@ -24,9 +38,8 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
             }
             var themeEngine = (ShopifyLiquidThemeEngine)Template.FileSystem;
             var amount = Convert.ToDecimal(input, CultureInfo.InvariantCulture);
-            var money = new Money(amount / 100, themeEngine.WorkContext.CurrentCurrency);
-
-            return money.ToString();
+            var currency = currencyCode == null ? themeEngine.WorkContext.CurrentCurrency : new Currency(themeEngine.WorkContext.CurrentLanguage, currencyCode);
+            return new Money(amount / 100, currency);
         }
     }
 }

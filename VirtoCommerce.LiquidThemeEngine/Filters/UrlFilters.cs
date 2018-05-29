@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Linq;
 using System.Web;
 using DotLiquid;
 using VirtoCommerce.LiquidThemeEngine.Extensions;
 using VirtoCommerce.Storefront.Model.Catalog;
+using VirtoCommerce.Storefront.Model.Common;
 using VirtoCommerce.Storefront.Model.Stores;
 using shopifyModel = VirtoCommerce.LiquidThemeEngine.Objects;
 using storefrontModel = VirtoCommerce.Storefront.Model;
@@ -81,8 +82,15 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
                 retVal = collection.Image != null ? collection.Image.Src : null;
             }
 
-            var url = new Uri(retVal);
-            retVal = url.AbsoluteUri.Replace(url.Scheme + ":", string.Empty);
+            if (!string.IsNullOrEmpty(retVal))
+            {
+                if (!string.IsNullOrEmpty(type))
+                {
+                    retVal = retVal.AddSuffixToFileUrl(string.Format("_{0}", type));
+                }
+
+                retVal = retVal.RemoveLeadingUriScheme();
+            }
 
             return retVal;
         }
@@ -153,31 +161,18 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
         }
 
         /// <summary>
-        /// Returns the URL of a global assets that are found on Shopify's servers. 
-        /// In virtocommerce is a same asset folder
-        /// customer.css
+        /// Returns the URL of a file in the "assets/static" folder of a theme.
+        /// {{ 'shop.css' | static_asset_url }}
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        public static string ShopifyAssetUrl(string input)
-        {
-            return GlobalAssetUrl(input);
-        }
-
-
-        /// <summary>
-        /// Returns the URL of a global asset. Global assets are kept in a directory on Shopify's servers. Using global assets can improve the load times of your pages.
-        /// In virtocommerce is a same asset folder
-        /// </summary>
-        /// <param name="input"></param>
-        /// <returns></returns>
-        public static string GlobalAssetUrl(string input)
+        public static string StaticAssetUrl(string input)
         {
             string retVal = null;
             if (input != null)
             {
                 var themeAdaptor = (ShopifyLiquidThemeEngine)Template.FileSystem;
-                retVal = themeAdaptor.GetGlobalAssetAbsoluteUrl(input);
+                retVal = themeAdaptor.GetAssetAbsoluteUrl("static/" + input.TrimStart('/'));
             }
             return retVal;
         }
@@ -245,6 +240,9 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
         /// <returns></returns>
         public static string AbsoluteUrl(string input, string storeId = null, string languageCode = null)
         {
+            if (input == null)
+                return string.Empty;
+
             var themeAdaptor = (ShopifyLiquidThemeEngine)Template.FileSystem;
             Store store = null;
             storefrontModel.Language language = null;
@@ -264,7 +262,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
             return retVal;
         }
 
-        public static string ProductImgUrl(object input, string type)
+        public static string ProductImgUrl(object input, string type = null)
         {
             return ImgUrl(input, type);
         }
@@ -272,6 +270,23 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
         public static string Within(string input, object collection)
         {
             return BuildAbsoluteUrl(input);
+        }
+
+        /// <summary>
+        /// Appends hash of file content as file version to invalidate browser cache when file changed.
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public static string AppendVersion(string input)
+        {
+            if (input == null)
+                return string.Empty;
+
+            var themeEngine = (ShopifyLiquidThemeEngine)Template.FileSystem;
+            var basePath = themeEngine.GetAssetAbsoluteUrl("");
+            var relativePath = input.StartsWith(basePath) ? input.Remove(0, basePath.Length) : input;
+            var hash = themeEngine.GetAssetHash(relativePath);
+            return input.Contains('?') ? $"{input}&v={hash}" : $"{input}?v={hash}";
         }
 
         private static string BuildOnClickLink(string title, string onclickFormat, params object[] onclickArgs)
@@ -318,17 +333,14 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
             else
             {
                 var tag = tagObject as shopifyModel.Tag;
-
                 if (tag != null)
                 {
                     href = GetCurrentUrlWithTags(action, tag.GroupName, tag.Value);
-                    title = BuildTagActionTitle(action, tag.Label);
-
-                    label = tag.Label;
+                    title = BuildTagActionTitle(action, label);
 
                     if (tag.Count > 0)
                     {
-                        label += string.Format(" ({0})", tag.Count);
+                        label = $"{label} ({tag.Count})";
                     }
                 }
                 else
@@ -350,9 +362,9 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
             switch (action)
             {
                 case TagAction.Remove:
-                    return "Remove tag " + tagLabel;
+                    return $"Remove tag '{tagLabel}'";
                 default:
-                    return "Show products matching tag " + tagLabel;
+                    return $"Show products matching tag '{tagLabel}'";
             }
         }
 
@@ -361,7 +373,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Filters
             var themeEngine = (ShopifyLiquidThemeEngine)Template.FileSystem;
             var workContext = themeEngine.WorkContext;
 
-            var terms = workContext.CurrentCatalogSearchCriteria.Terms
+            var terms = workContext.CurrentProductSearchCriteria.Terms
                 .Select(t => new Term { Name = t.Name, Value = t.Value })
                 .ToList();
 

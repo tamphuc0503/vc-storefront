@@ -3,12 +3,14 @@ using VirtoCommerce.Storefront.Model.Common;
 
 namespace VirtoCommerce.Storefront.Model.Marketing
 {
-    public class Discount : ValueObject<Discount>, IConvertible<Discount>
+    public partial class Discount : ValueObject<Discount>, IConvertible<Discount>
     {
+        public Discount()
+        {
+        }
         public Discount(Currency currency)
         {
             Amount = new Money(currency);
-            AmountWithTax = new Money(currency);
         }
         /// <summary>
         /// Gets or sets the value of promotion id
@@ -20,7 +22,7 @@ namespace VirtoCommerce.Storefront.Model.Marketing
         /// </summary>
         public Money Amount { get; set; }
 
-        public Money AmountWithTax { get; set; }
+        public string Coupon { get; set; }
 
         /// <summary>
         /// Gets or sets the value of discount description
@@ -33,8 +35,8 @@ namespace VirtoCommerce.Storefront.Model.Marketing
             var retVal = new Discount(currency);
             retVal.PromotionId = PromotionId;
             retVal.Description = Description;
+            retVal.Coupon = Coupon;
             retVal.Amount = Amount.ConvertTo(currency);
-            retVal.AmountWithTax = AmountWithTax.ConvertTo(currency);
             return retVal;
         }
         #endregion

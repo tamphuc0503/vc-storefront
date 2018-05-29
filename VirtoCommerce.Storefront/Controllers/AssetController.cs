@@ -23,6 +23,18 @@ namespace VirtoCommerce.Storefront.Controllers
         }
 
         /// <summary>
+        /// GET: /themes/localization.json
+        /// Return localization resources for current theme
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        public ActionResult GetThemeLocalizationJson()
+        {
+            var retVal = _themeEngine.ReadLocalization();
+            return Json(retVal, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
         /// GET: /themes/assets/{*asset}
         /// Handle theme assets requests
         /// </summary>
@@ -32,28 +44,9 @@ namespace VirtoCommerce.Storefront.Controllers
         public ActionResult GetThemeAssets(string path)
         {
             var stream = _themeEngine.GetAssetStream(path);
-            if (stream != null)
-            {
-                return File(stream, MimeMapping.GetMimeMapping(path));
-            }
-            throw new HttpException(404, path);
-        }
-
-        /// <summary>
-        /// GET: /themes/global/assets/{*asset}
-        /// Handle global theme assets requests
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        [HttpGet]
-        public ActionResult GetGlobalThemeAssets(string path)
-        {
-            var stream = _themeEngine.GetAssetStream(path, searchInGlobalThemeOnly: true);
-            if (stream != null)
-            {
-                return File(stream, MimeMapping.GetMimeMapping(path));
-            }
-            throw new HttpException(404, path);
+            return stream != null
+                ? File(stream, MimeMapping.GetMimeMapping(path))
+                : HandleStaticFiles(path);
         }
 
         /// <summary>
@@ -65,16 +58,16 @@ namespace VirtoCommerce.Storefront.Controllers
         [HttpGet]
         public ActionResult GetStaticContentAssets(string path)
         {
-            string blobPath = _staticContentBlobProvider.Search(Path.Combine(WorkContext.CurrentStore.Id, "assets"), path, true).FirstOrDefault();
-            if(!string.IsNullOrEmpty(blobPath))
+            var blobPath = _staticContentBlobProvider.Search(Path.Combine(WorkContext.CurrentStore.Id, "assets"), path, true).FirstOrDefault();
+            if (!string.IsNullOrEmpty(blobPath))
             {
                 var stream = _staticContentBlobProvider.OpenRead(blobPath);
-                if(stream != null)
+                if (stream != null)
                 {
                     return File(stream, MimeMapping.GetMimeMapping(blobPath));
                 }
             }
-        
+
             throw new HttpException(404, path);
         }
 
@@ -93,6 +86,5 @@ namespace VirtoCommerce.Storefront.Controllers
             }
             throw new HttpException(404, path);
         }
-
     }
 }

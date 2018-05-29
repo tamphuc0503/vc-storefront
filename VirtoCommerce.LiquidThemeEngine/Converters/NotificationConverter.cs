@@ -1,19 +1,26 @@
-﻿using VirtoCommerce.LiquidThemeEngine.Objects;
+﻿using Microsoft.Practices.ServiceLocation;
+using Omu.ValueInjecter;
+using VirtoCommerce.LiquidThemeEngine.Objects;
 using VirtoCommerce.Storefront.Model;
+using VirtoCommerce.Storefront.Model.Common;
 
 namespace VirtoCommerce.LiquidThemeEngine.Converters
 {
     public static class NotificationConverter
     {
-        public static Notification ToShopifyModel(this StorefrontNotification storefrontModel)
+        public static Notification ToShopifyModel(this StorefrontNotification notification)
         {
-            var shopifyModel = new Notification();
-
-            shopifyModel.Message = storefrontModel.Message;
-            shopifyModel.Title = storefrontModel.Title;
-            shopifyModel.Type = storefrontModel.Type.ToString();
-
-            return shopifyModel;
+            var converter = ServiceLocator.Current.GetInstance<ShopifyModelConverter>();
+            return converter.ToLiquidNotification(notification);
+        }
+    }
+    public partial class ShopifyModelConverter
+    {
+        public virtual Notification ToLiquidNotification(StorefrontNotification notification)
+        {
+            var result = new Notification();
+            result.InjectFrom<NullableAndEnumValueInjecter>(notification);
+            return result;
         }
     }
 }

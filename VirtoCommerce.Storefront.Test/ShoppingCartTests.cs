@@ -5,6 +5,7 @@ using VirtoCommerce.Storefront.Model;
 using VirtoCommerce.Storefront.Model.Cart.Services;
 using VirtoCommerce.Storefront.Model.Common;
 using VirtoCommerce.Storefront.Model.Customer;
+using VirtoCommerce.Storefront.Model.Inventory.Services;
 using VirtoCommerce.Storefront.Services;
 using Xunit;
 
@@ -22,14 +23,16 @@ namespace VirtoCommerce.Storefront.Test
                 Id = Guid.NewGuid().ToString(),
                 IsRegisteredUser = false
             };
-            cartBuilder = cartBuilder.GetOrCreateNewTransientCartAsync(workContext.CurrentStore, anonymousCustomer, workContext.CurrentLanguage, workContext.CurrentCurrency).Result;
+            var task = cartBuilder.LoadOrCreateNewTransientCartAsync("default", workContext.CurrentStore, anonymousCustomer, workContext.CurrentLanguage, workContext.CurrentCurrency);
+            task.Wait();
             Assert.True(cartBuilder.Cart.IsTransient());
 
-            cartBuilder.SaveAsync().Wait();
+            //cartBuilder.SaveAsync().Wait();
             var cart = cartBuilder.Cart;
             Assert.False(cart.IsTransient());
 
-            cartBuilder = cartBuilder.GetOrCreateNewTransientCartAsync(workContext.CurrentStore, anonymousCustomer, workContext.CurrentLanguage, workContext.CurrentCurrency).Result;
+            task = cartBuilder.LoadOrCreateNewTransientCartAsync("default", workContext.CurrentStore, anonymousCustomer, workContext.CurrentLanguage, workContext.CurrentCurrency);
+            task.Wait();
             Assert.Equal(cart.Id, cartBuilder.Cart.Id);
         }
 
@@ -55,27 +58,26 @@ namespace VirtoCommerce.Storefront.Test
 
         private ICartBuilder GetCartBuilder()
         {
-            var catalogModuleApi = GetCatalogApiClient();
+            var catalogApi = GetCatalogApiClient();
             var cartApi = GetCartApiClient();
-            var commerceApi = GetCoreApiClient();
             var marketingApi = GetMarketingApiClient();
             var inventoryApi = GetInventoryApiClient();
             var pricingApi = GetPricingApiClient();
-            var searchApi = GetSearchApiClient();
             var customerApi = GetCustomerApiClient();
             var orderApi = GetOrderApiClient();
             var quoteApi = GetQuoteApiClient();
             var storeApi = GetStoreApiClient();
 
             var cacheManager = new Mock<ILocalCacheManager>().Object;
+            var inventoryService = new Mock<IInventoryService>().Object;
             var workContextFactory = new Func<WorkContext>(GetTestWorkContext);
             var promotionEvaluator = new PromotionEvaluator(marketingApi);
 
-            var pricingService = new PricingServiceImpl(workContextFactory, pricingApi, commerceApi);
-            var customerService = new CustomerServiceImpl(workContextFactory, customerApi, orderApi, quoteApi, storeApi, cacheManager);
-            var catalogSearchService = new CatalogSearchServiceImpl(workContextFactory, catalogModuleApi, pricingService, inventoryApi, searchApi, promotionEvaluator, customerService);
+            var pricingService = new PricingServiceImpl(pricingApi, null, promotionEvaluator, inventoryService);
+            var customerService = new CustomerServiceImpl(workContextFactory, customerApi, orderApi, quoteApi, storeApi, null, cacheManager);
+            var catalogSearchService = new CatalogSearchServiceImpl(workContextFactory, catalogApi, inventoryApi, pricingService, customerService, null, null, inventoryService);
 
-            var retVal = new CartBuilder(cartApi, promotionEvaluator, catalogSearchService, commerceApi, cacheManager);
+            var retVal = new CartBuilder(workContextFactory, cartApi, catalogSearchService, cacheManager, promotionEvaluator, null, null, null);
             return retVal;
         }
     }

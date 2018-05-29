@@ -10,7 +10,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Objects
     /// <summary>
     /// https://docs.shopify.com/themes/liquid-documentation/objects/page
     /// </summary>
-    public class Page : Drop
+    public partial class Page : Drop
     {
         /// <summary>
         /// Returns the author of a page.
@@ -44,9 +44,17 @@ namespace VirtoCommerce.LiquidThemeEngine.Objects
         /// </summary>
         public string Title { get; set; }
 
+        public string Description { get; set; }
+
         /// <summary>
         /// Returns the relative URL of the page.
         /// </summary>
         public string Url { get; set; }
+
+        public string Type { get; set; }
+
+        public int Priority { get; set; }
+
+        public MetafieldsCollection MetaInfo { get; set; }
     }
 }

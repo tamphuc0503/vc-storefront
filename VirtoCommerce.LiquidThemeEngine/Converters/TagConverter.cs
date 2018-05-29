@@ -1,4 +1,5 @@
-﻿using VirtoCommerce.LiquidThemeEngine.Objects;
+using Microsoft.Practices.ServiceLocation;
+using VirtoCommerce.LiquidThemeEngine.Objects;
 using VirtoCommerce.Storefront.Model.Catalog;
 
 namespace VirtoCommerce.LiquidThemeEngine.Converters
@@ -7,17 +8,38 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
     {
         public static Tag ToShopifyModel(this Term term)
         {
-            return new Tag(term.Name, term.Value);
+            var converter = ServiceLocator.Current.GetInstance<ShopifyModelConverter>();
+            return converter.ToLiquidTag(term);
         }
 
-        public static Tag ToShopifyModel(this AggregationItem item, string groupName, string groupLabel)
+        public static Tag ToShopifyModel(this AggregationItem item, Aggregation aggregation)
         {
-            return new Tag(groupName, item.Value != null ? item.Value.ToString() : null)
+            var converter = ServiceLocator.Current.GetInstance<ShopifyModelConverter>();
+            return converter.ToLiquidTag(item, aggregation);
+        }
+    }
+
+    public partial class ShopifyModelConverter
+    {
+        public virtual Tag ToLiquidTag(Term term)
+        {
+            var result = new Tag(term.Name, term.Value);
+            return result;
+        }
+
+        public virtual Tag ToLiquidTag(AggregationItem item, Aggregation aggregation)
+        {
+            var result = new Tag(aggregation.Field, item.Value?.ToString())
             {
-                GroupLabel = groupLabel,
+                GroupType = aggregation.AggregationType,
+                GroupLabel = aggregation.Label,
                 Label = item.Label,
                 Count = item.Count,
+                Lower = item.Lower,
+                Upper = item.Upper,
             };
+
+            return result;
         }
     }
 }

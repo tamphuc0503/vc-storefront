@@ -6,7 +6,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Objects
     /// <summary>
     /// https://docs.shopify.com/themes/liquid/objects/search
     /// </summary>
-    public class Search : Drop
+    public partial class Search : Drop
     {
         /// <summary>
         /// Returns  true  if an HTML form with the attribute  action="/search"  was submitted successfully. This allows you to show content based on whether a search was performed or not.
@@ -23,8 +23,15 @@ namespace VirtoCommerce.LiquidThemeEngine.Objects
         public int ResultsCount { get { return Results.GetTotalCount(); } }
 
         /// <summary>
-        /// Returns the string that was entered in the search input box. Use the highlight filter to apply a different 
+        /// Returns the string that was entered in the search input box.
         /// </summary>
         public string Terms { get; set; }
+
+        public string SearchIn { get; set; }
+
+        /// <summary>
+        /// Returns a list of all tags in a search result.
+        /// </summary>
+        public TagCollection AllTags { get; set; }
     }
 }

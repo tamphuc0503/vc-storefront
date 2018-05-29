@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>VirtoCommerce.Storefront.Model</RootNamespace>
     <AssemblyName>VirtoCommerce.Storefront.Model</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -21,6 +21,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -29,11 +30,11 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="CacheManager.Core, Version=0.8.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\CacheManager.Core.0.8.0\lib\net45\CacheManager.Core.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="CacheManager.Core, Version=0.9.3.0, Culture=neutral, PublicKeyToken=5b450b4fb65c4cdb, processorArchitecture=MSIL">
+      <HintPath>..\packages\CacheManager.Core.0.9.3\lib\net45\CacheManager.Core.dll</HintPath>
     </Reference>
     <Reference Include="Omu.ValueInjecter, Version=2.3.3.0, Culture=neutral, PublicKeyToken=c7694541b0ac80e4, processorArchitecture=MSIL">
       <HintPath>..\packages\valueinjecter.2.3.3\lib\net35\Omu.ValueInjecter.dll</HintPath>
@@ -63,19 +64,13 @@
     <Compile Include="AmountType.cs" />
     <Compile Include="Attachment.cs" />
     <Compile Include="BankCardInfo.cs" />
+    <Compile Include="BulkOrder\BulkOrderItem.cs" />
     <Compile Include="Cart\CartShipmentItem.cs" />
-    <Compile Include="Cart\PaymentUpdateModel.cs" />
     <Compile Include="Cart\Services\ICartBuilder.cs" />
-    <Compile Include="Cart\Services\ICartValidator.cs" />
     <Compile Include="Cart\Services\IValidatable.cs" />
-    <Compile Include="Cart\ShipmentItemUpdateModel.cs" />
-    <Compile Include="Cart\ShipmentUpdateModel.cs" />
-    <Compile Include="Cart\ValidationErrors\CartSubtotalError.cs" />
-    <Compile Include="Cart\ValidationErrors\ProductPriceError.cs" />
-    <Compile Include="Cart\ValidationErrors\ProductQuantityError.cs" />
-    <Compile Include="Cart\ValidationErrors\ProductUnavailableError.cs" />
-    <Compile Include="Cart\ValidationErrors\ShippingPriceError.cs" />
-    <Compile Include="Cart\ValidationErrors\ShippingUnavailableError.cs" />
+    <Compile Include="Cart\ValidationErrors\PriceError.cs" />
+    <Compile Include="Cart\ValidationErrors\QuantityError.cs" />
+    <Compile Include="Cart\ValidationErrors\UnavailableError.cs" />
     <Compile Include="Cart\ValidationErrors\ValidationError.cs" />
     <Compile Include="Catalog\Aggregation.cs" />
     <Compile Include="Catalog\AggregationItem.cs" />
@@ -89,16 +84,20 @@
     <Compile Include="Catalog\IHasProperties.cs" />
     <Compile Include="Catalog\InventoryStatus.cs" />
     <Compile Include="Catalog\ItemResponseGroup.cs" />
-    <Compile Include="Catalog\CatalogSearchCriteria.cs" />
     <Compile Include="Catalog\ProductAssociation.cs" />
+    <Compile Include="Catalog\CategorySearchCriteria.cs" />
+    <Compile Include="Catalog\ProductSearchCriteria.cs" />
+    <Compile Include="Catalog\Services\IProductAvailabilityService.cs" />
     <Compile Include="Catalog\Term.cs" />
     <Compile Include="Catalog\TermExtensions.cs" />
     <Compile Include="Common\AnonymousComparer.cs" />
     <Compile Include="Common\CacheManagerBase.cs" />
+    <Compile Include="Common\ConfigurationHelper.cs" />
     <Compile Include="Common\DistributedCacheManager.cs" />
     <Compile Include="Common\EntryState.cs" />
     <Compile Include="Common\EnumerableExtension.cs" />
     <Compile Include="Common\IDistributedCacheManager.cs" />
+    <Compile Include="Common\IEntity.cs" />
     <Compile Include="Common\ILocalCacheManager.cs" />
     <Compile Include="Common\IMutablePagedList.cs" />
     <Compile Include="Common\IQueryableExtensions.cs" />
@@ -106,16 +105,35 @@
     <Compile Include="Common\LocalCacheManager.cs" />
     <Compile Include="Common\MutablePagedList.cs" />
     <Compile Include="Common\NameValueCollectionExtensions.cs" />
+    <Compile Include="Common\NumericRange.cs" />
     <Compile Include="Common\SortInfo.cs" />
+    <Compile Include="Common\TypeExtensions.cs" />
+    <Compile Include="Interaction\UserEvent.cs" />
+    <Compile Include="Customer\VendorSearchCriteria.cs" />
     <Compile Include="EditorialReview.cs" />
     <Compile Include="Common\StreamExtensions.cs" />
     <Compile Include="Common\SettingsExtension.cs" />
     <Compile Include="IHasLanguage.cs" />
     <Compile Include="IHasSettings.cs" />
+    <Compile Include="Interaction\Page.cs" />
+    <Compile Include="Interaction\Client.cs" />
+    <Compile Include="Interaction\UserSession.cs" />
+    <Compile Include="Inventory\FulfilmentCenter.cs" />
+    <Compile Include="Inventory\Services\IInventoryService.cs" />
+    <Compile Include="Recommendations\CognitiveRecommendationEvalContext.cs" />
+    <Compile Include="Recommendations\IRecommendationsService.cs" />
+    <Compile Include="Recommendations\RecommendationEvalContext.cs" />
     <Compile Include="SeoLinksType.cs" />
     <Compile Include="SettingEntry.cs" />
     <Compile Include="LoginProvider.cs" />
+    <Compile Include="StaticContent\StaticContentSearchCriteria.cs" />
     <Compile Include="StaticContent\Services\IContentBlobProvider.cs" />
+    <Compile Include="Subscriptions\PaymentInterval.cs" />
+    <Compile Include="Subscriptions\PaymentPlan.cs" />
+    <Compile Include="Subscriptions\Subscription.cs" />
+    <Compile Include="Subscriptions\SubscriptionCancelRequest.cs" />
+    <Compile Include="Subscriptions\SubscriptionResponseGroup.cs" />
+    <Compile Include="Subscriptions\SubscriptionSearchCriteria.cs" />
     <Compile Include="Tax\ITaxable.cs" />
     <Compile Include="LinkList\CategoryMenuLink.cs" />
     <Compile Include="Common\Events\EventPublisher.cs" />
@@ -139,6 +157,8 @@
     <Compile Include="StorefrontNotification.cs" />
     <Compile Include="StorefrontNotificationType.cs" />
     <Compile Include="Stores\StoreStatus.cs" />
+    <Compile Include="Tax\Services\ITaxEvaluator.cs" />
+    <Compile Include="Tax\TaxEvaluationContext.cs" />
     <Compile Include="Tax\TaxLine.cs" />
     <Compile Include="Tax\TaxRate.cs" />
     <Compile Include="TierPrice.cs" />
@@ -159,7 +179,6 @@
     <Compile Include="LinkList\MenuLink.cs" />
     <Compile Include="LinkList\MenuLinkList.cs" />
     <Compile Include="Marketing\Promotion.cs" />
-    <Compile Include="Marketing\PromotionProductEntry.cs" />
     <Compile Include="Marketing\PromotionEvaluationContext.cs" />
     <Compile Include="Marketing\PromotionReward.cs" />
     <Compile Include="Marketing\PromotionRewardType.cs" />
@@ -194,7 +213,7 @@
     <Compile Include="Order\Shipment.cs" />
     <Compile Include="Order\ShipmentItem.cs" />
     <Compile Include="Order\ShipmentPackage.cs" />
-    <Compile Include="PaymentMethod.cs" />
+    <Compile Include="Cart\PaymentMethod.cs" />
     <Compile Include="Pricing\Services\IPricingService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Quote\QuoteItem.cs" />
@@ -211,9 +230,8 @@
     <Compile Include="StaticContent\BlogSearchCriteria.cs" />
     <Compile Include="StaticContent\ContentItem.cs" />
     <Compile Include="StaticContent\ContentPage.cs" />
-    <Compile Include="StaticContent\ContentPublicationStatus.cs" />
     <Compile Include="StaticContent\Services\IStaticContentService.cs" />
-    <Compile Include="ShippingMethod.cs" />
+    <Compile Include="Cart\ShippingMethod.cs" />
     <Compile Include="Marketing\Discount.cs" />
     <Compile Include="Cart\LineItem.cs" />
     <Compile Include="Cart\Payment.cs" />
@@ -221,8 +239,7 @@
     <Compile Include="Cart\ShoppingCart.cs" />
     <Compile Include="Stores\Store.cs" />
     <Compile Include="Tax\TaxDetail.cs" />
-    <Compile Include="ValidationType.cs" />
-    <Compile Include="Vendor.cs" />
+    <Compile Include="Customer\Vendor.cs" />
     <Compile Include="WorkContext.cs" />
   </ItemGroup>
   <ItemGroup>

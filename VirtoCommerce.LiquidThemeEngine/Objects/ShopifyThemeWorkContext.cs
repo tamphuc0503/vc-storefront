@@ -8,7 +8,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Objects
     /// <summary>
     /// https://docs.shopify.com/themes/liquid-documentation/objects
     /// </summary>
-    public class ShopifyThemeWorkContext : ILiquidizable
+    public partial class ShopifyThemeWorkContext : ILiquidizable
     {
         #region Aliases for shopify theme compliance
 
@@ -52,6 +52,10 @@ namespace VirtoCommerce.LiquidThemeEngine.Objects
         public Pages Pages { get; set; }
 
         /// <summary>
+        /// Contains blog search options
+        /// </summary>
+        public BlogSearch BlogSearch { get; set; }
+        /// <summary>
         /// Contains collection of all blogs
         /// </summary>
         public Blogs Blogs { get; set; }
@@ -63,10 +67,12 @@ namespace VirtoCommerce.LiquidThemeEngine.Objects
         public Page Page { get; set; }
 
         public Blog Blog { get; set; }
+
         /// <summary>
         /// Current blog article
         /// </summary>
         public Article Article { get; set; }
+
         /// <summary>
         /// HTML code for payment method prepared form
         /// </summary>

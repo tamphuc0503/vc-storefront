@@ -5,7 +5,7 @@ namespace VirtoCommerce.Storefront.Model.Marketing
     /// <summary>
     /// Represents promotion reward object
     /// </summary>
-    public class PromotionReward
+    public partial class PromotionReward
     {
         /// <summary>
         /// Gets or sets promotion reward amount
@@ -92,14 +92,18 @@ namespace VirtoCommerce.Storefront.Model.Marketing
         /// </summary>
         public string ShippingMethodCode { get; set; }
 
-        public Discount ToDiscountModel(Money amount, Money withTaxAmount)
+        /// <summary>
+        /// Gets or sets the payment method code for the marketing reward
+        /// </summary>
+        public string PaymentMethodCode { get; set; }
+
+        public Discount ToDiscountModel(Money amount)
         {
             var absoluteAmount = GetAbsoluteDiscountAmount(amount.Amount);
-            var absoluteAmountWithTax = GetAbsoluteDiscountAmount(withTaxAmount.Amount);
             var discount = new Discount(amount.Currency);
             discount.Amount = new Money(absoluteAmount, amount.Currency);
-            discount.AmountWithTax = new Money(absoluteAmountWithTax, withTaxAmount.Currency);
             discount.Description = Promotion.Description;
+            discount.Coupon = Coupon;
             discount.PromotionId = Promotion.Id;
 
             return discount;

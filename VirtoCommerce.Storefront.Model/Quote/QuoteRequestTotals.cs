@@ -2,7 +2,7 @@
 
 namespace VirtoCommerce.Storefront.Model.Quote
 {
-    public class QuoteRequestTotals
+    public partial class QuoteRequestTotals
     {
         public QuoteRequestTotals()
         {
@@ -34,6 +34,6 @@ namespace VirtoCommerce.Storefront.Model.Quote
 
         public Money GrandTotalExlTax { get; set; }
 
-        public Money GrandTotalInclTax { get; set; }
+        public Money GrandTotalInclTax { get; set; }      
     }
 }

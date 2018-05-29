@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Linq;
+using Microsoft.Practices.ServiceLocation;
 using Omu.ValueInjecter;
 using PagedList;
 using VirtoCommerce.LiquidThemeEngine.Objects;
@@ -13,12 +14,31 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
     {
         public static Customer ToShopifyModel(this CustomerInfo customer, StorefrontModel.WorkContext workContext, IStorefrontUrlBuilder urlBuilder)
         {
+            var converter = ServiceLocator.Current.GetInstance<ShopifyModelConverter>();
+            return converter.ToLiquidCustomer(customer, workContext, urlBuilder);
+        }
+    }
+
+    public partial class ShopifyModelConverter
+    {
+        public virtual Customer ToLiquidCustomer(CustomerInfo customer, StorefrontModel.WorkContext workContext, IStorefrontUrlBuilder urlBuilder)
+        {
             var result = new Customer();
+
             result.InjectFrom<NullableAndEnumValueInjecter>(customer);
             result.Name = customer.FullName;
-            result.DefaultAddress = customer.DefaultAddress.ToShopifyModel();
-            result.DefaultBillingAddress = customer.DefaultBillingAddress.ToShopifyModel();
-            result.DefaultShippingAddress = customer.DefaultShippingAddress.ToShopifyModel();
+            if(customer.DefaultAddress != null)
+            {
+                result.DefaultAddress = ToLiquidAddress(customer.DefaultAddress);
+            }
+            if(customer.DefaultBillingAddress != null)
+            {
+                result.DefaultBillingAddress = ToLiquidAddress(customer.DefaultBillingAddress);
+            }
+            if (customer.DefaultShippingAddress != null)
+            {
+                result.DefaultShippingAddress = ToLiquidAddress(customer.DefaultShippingAddress);
+            }
 
             if (customer.Tags != null)
             {
@@ -27,15 +47,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
 
             if (customer.Addresses != null)
             {
-                var addresses = customer.Addresses.Select(a => a.ToShopifyModel()).ToList();
-
-                // Add virtual ID to each address
-                var id = 1;
-                foreach (var address in addresses)
-                {
-                    address.Id = id.ToString(CultureInfo.InvariantCulture);
-                    id++;
-                }
+                var addresses = customer.Addresses.Select(a => ToLiquidAddress(a)).ToList();
                 result.Addresses = new MutablePagedList<Address>(addresses);
             }
 
@@ -44,7 +56,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
                 result.Orders = new MutablePagedList<Order>((pageNumber, pageSize, sortInfos) =>
                 {
                     customer.Orders.Slice(pageNumber, pageSize, sortInfos);
-                    return new StaticPagedList<Order>(customer.Orders.Select(x => x.ToShopifyModel(urlBuilder)), customer.Orders);
+                    return new StaticPagedList<Order>(customer.Orders.Select(x =>ToLiquidOrder(x, workContext.CurrentLanguage, urlBuilder)), customer.Orders);
                 }, customer.Orders.PageNumber, customer.Orders.PageSize);
             }
 
@@ -53,7 +65,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
                 result.QuoteRequests = new MutablePagedList<QuoteRequest>((pageNumber, pageSize, sortInfos) =>
                 {
                     customer.QuoteRequests.Slice(pageNumber, pageSize, sortInfos);
-                    return new StaticPagedList<QuoteRequest>(customer.QuoteRequests.Select(x => x.ToShopifyModel()), customer.QuoteRequests);
+                    return new StaticPagedList<QuoteRequest>(customer.QuoteRequests.Select(x => ToLiquidQuoteRequest(x)), customer.QuoteRequests);
                 }, customer.QuoteRequests.PageNumber, customer.QuoteRequests.PageSize);
             }
 

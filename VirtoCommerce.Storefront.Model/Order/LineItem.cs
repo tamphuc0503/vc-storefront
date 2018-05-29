@@ -8,67 +8,28 @@ namespace VirtoCommerce.Storefront.Model.Order
     /// <summary>
     /// Represents order line item
     /// </summary>
-    public class LineItem
+    public partial class LineItem
     {
-        public LineItem()
+        public LineItem(Currency currency)
         {
+            Currency = currency;
             TaxDetails = new List<TaxDetail>();
             DynamicProperties = new List<DynamicProperty>();
-        }
 
-        /// <summary>
-        /// Price where tax and discount are not applied
-        /// </summary>
-        /// <value>Price with tax and without dicount</value>
-        public Money BasePrice { get; set; }
-        public Money BasePriceWithTax
-        {
-            get
-            {
-                return BasePrice + BasePrice * TaxRate;
-            }
-        }
-
-        /// <summary>
-        /// Price where tax is not applied and discount is applied
-        /// </summary>
-        /// <value>Price with tax and discount</value>
-        public Money Price { get; set; }
-        public Money PriceWithTax
-        {
-            get
-            {
-                return Price + Price * TaxRate;
-            }
-        }
-
-        /// <summary>
-        /// Discount amount
-        /// </summary>
-        /// <value>Discount amount</value>
-        public Money DiscountAmount { get; set; }
-
-        /// <summary>
-        /// Tax sum
-        /// </summary>
-        /// <value>Tax sum</value>
-        public Money Tax { get; set; }
-
-        /// <summary>
-        /// Evaluated from Tax total Tax rate
-        /// </summary>
-        public decimal TaxRate
-        {
-            get
-            {
-                var retVal = 0m;
-                if (Tax != null)
-                {
-                    retVal = Tax.Amount / (Price.Amount * (Quantity ?? 1));
-                }
-                return retVal;
-            }
-        }
+            ListPrice = new Money(currency);
+            ListPriceWithTax = new Money(currency);
+            PlacedPrice = new Money(currency);
+            PlacedPriceWithTax = new Money(currency);
+            ExtendedPrice = new Money(currency);
+            ExtendedPriceWithTax = new Money(currency);
+            DiscountAmount = new Money(currency);
+            DiscountAmountWithTax = new Money(currency);
+            DiscountTotal = new Money(currency);
+            DiscountTotalWithTax = new Money(currency);
+            TaxTotal = new Money(currency);
+            Discounts = new List<Discount>();
+        }          
+      
 
         /// <summary>
         /// Gets or Sets Currency
@@ -90,6 +51,11 @@ namespace VirtoCommerce.Storefront.Model.Order
         /// Gets or Sets ProductId
         /// </summary>
         public string ProductId { get; set; }
+
+        /// <summary>
+        /// Gets or Sets SKU
+        /// </summary>
+        public string Sku { get; set; }
 
         /// <summary>
         /// Gets or Sets CatalogId
@@ -161,11 +127,7 @@ namespace VirtoCommerce.Storefront.Model.Order
         /// </summary>
         public double? Width { get; set; }
 
-        /// <summary>
-        /// Gets or Sets TaxType
-        /// </summary>
-        public string TaxType { get; set; }
-
+      
         /// <summary>
         /// Flag represent that line item was canceled
         /// </summary>
@@ -182,12 +144,7 @@ namespace VirtoCommerce.Storefront.Model.Order
         /// </summary>
         /// <value>Text representation of cancel reason</value>
         public string CancelReason { get; set; }
-
-        /// <summary>
-        /// Gets or Sets Discount
-        /// </summary>
-        public Discount Discount { get; set; }
-
+              
         /// <summary>
         /// Gets or Sets TaxDetails
         /// </summary>
@@ -229,5 +186,30 @@ namespace VirtoCommerce.Storefront.Model.Order
         /// Gets or Sets Id
         /// </summary>
         public string Id { get; set; }
+
+
+        public Money ListPrice { get; set; }
+        public Money ListPriceWithTax { get; set; }
+
+        public Money PlacedPrice { get; set; }
+        public Money PlacedPriceWithTax { get; set; }
+
+        public Money ExtendedPrice { get; set; }
+        public Money ExtendedPriceWithTax { get; set; }
+
+        public Money DiscountAmount { get; set; }
+        public Money DiscountAmountWithTax { get; set; }
+
+        public Money DiscountTotal { get; set; }
+        public Money DiscountTotalWithTax { get; set; }
+
+        public string TaxType { get; set; }
+        public Money TaxTotal { get; set; }
+        public decimal TaxPercentRate { get; set; }
+
+
+        public ICollection<Discount> Discounts { get; set; }
+
+
     }
 }

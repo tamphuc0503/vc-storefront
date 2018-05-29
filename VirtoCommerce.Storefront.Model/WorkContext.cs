@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using VirtoCommerce.Storefront.Model.Cart;
 using VirtoCommerce.Storefront.Model.Catalog;
 using VirtoCommerce.Storefront.Model.Common;
@@ -15,7 +16,7 @@ namespace VirtoCommerce.Storefront.Model
     /// <summary>
     /// Main working context contains all data which could be used in presentation logic
     /// </summary>
-    public class WorkContext : IDisposable
+    public partial class WorkContext : IDisposable
     {
         public WorkContext()
         {
@@ -28,6 +29,8 @@ namespace VirtoCommerce.Storefront.Model
         /// Current request url example: http:/host/app/store/en-us/search?page=2
         /// </summary>
         public Uri RequestUrl { get; set; }
+
+        public NameValueCollection QueryString { get; set; }
 
         public Login Login { get; set; }
         /// <summary>
@@ -134,15 +137,17 @@ namespace VirtoCommerce.Storefront.Model
         /// Represent products filtered by current search criteria CurrentCatalogSearchCriteria (loaded on first access by lazy loading)
         /// </summary>
         public IMutablePagedList<Product> Products { get; set; }
+
         /// <summary>
         /// Represent bucket, aggregated data based on a search query resulted by current search criteria CurrentCatalogSearchCriteria (example  color 33, gr
         /// </summary>
         public IMutablePagedList<Aggregation> Aggregations { get; set; }
 
         /// <summary>
-        /// Current search catalog criterias
+        /// Current search product search criterias
         /// </summary>
-        public CatalogSearchCriteria CurrentCatalogSearchCriteria { get; set; }
+        public ProductSearchCriteria CurrentProductSearchCriteria { get; set; }
+
         /// <summary>
         /// Current product response group
         /// </summary>
@@ -156,6 +161,10 @@ namespace VirtoCommerce.Storefront.Model
 
         #region Static Content Properties
         public ContentPage CurrentPage { get; set; }
+
+        public StaticContentSearchCriteria CurrentStaticSearchCriteria { get; set; }
+
+        public IMutablePagedList<ContentItem> StaticContentSearchResult { get; set; }
 
         public BlogSearchCriteria CurrentBlogSearchCritera { get; set; }
 
@@ -185,7 +194,7 @@ namespace VirtoCommerce.Storefront.Model
         public CustomerOrder CurrentOrder { get; set; }
 
 
-        public ContactUsForm ContactUsForm { get; set; }
+        public ContactForm ContactUsForm { get; set; }
 
         public StorefrontNotification StorefrontNotification { get; set; }
 

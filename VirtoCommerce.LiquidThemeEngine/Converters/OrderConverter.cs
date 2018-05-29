@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Practices.ServiceLocation;
 using Omu.ValueInjecter;
 using VirtoCommerce.LiquidThemeEngine.Objects;
 using VirtoCommerce.Storefront.Model;
@@ -12,7 +13,16 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
 {
     public static class OrderConverter
     {
-        public static Order ToShopifyModel(this CustomerOrder order, IStorefrontUrlBuilder urlBuilder)
+        public static Order ToShopifyModel(this CustomerOrder order, Storefront.Model.Language language, IStorefrontUrlBuilder urlBuilder)
+        {
+            var converter = ServiceLocator.Current.GetInstance<ShopifyModelConverter>();
+            return converter.ToLiquidOrder(order, language, urlBuilder);
+        }
+    }
+
+    public partial class ShopifyModelConverter
+    {
+        public virtual Order ToLiquidOrder(CustomerOrder order, Storefront.Model.Language language, IStorefrontUrlBuilder urlBuilder)
         {
             var result = new Order();
             result.InjectFrom<NullableAndEnumValueInjecter>(order);
@@ -24,6 +34,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
             result.CreatedAt = order.CreatedDate ?? DateTime.MinValue;
             result.Name = order.Number;
             result.OrderNumber = order.Number;
+            result.CurrencyCode = order.Currency.Code;
             result.CustomerUrl = urlBuilder.ToAppAbsolute("/account/order/" + order.Number);
 
             if (order.Addresses != null)
@@ -33,7 +44,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
 
                 if (shippingAddress != null)
                 {
-                    result.ShippingAddress = shippingAddress.ToShopifyModel();
+                    result.ShippingAddress = ToLiquidAddress(shippingAddress);
                 }
 
                 var billingAddress = order.Addresses
@@ -41,11 +52,11 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
 
                 if (billingAddress != null)
                 {
-                    result.BillingAddress = billingAddress.ToShopifyModel();
+                    result.BillingAddress = ToLiquidAddress(billingAddress);
                 }
                 else if (shippingAddress != null)
                 {
-                    result.BillingAddress = shippingAddress.ToShopifyModel();
+                    result.BillingAddress = ToLiquidAddress(shippingAddress);
                 }
 
                 result.Email = order.Addresses
@@ -55,12 +66,12 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
             }
 
 
-            var discountTotal = order.DiscountAmount != null ? order.DiscountAmount.Amount : 0;
+            var discountTotal = order.DiscountTotal;
             var discounts = new List<Discount>();
 
             if (order.Discount != null)
             {
-                discounts.Add(order.Discount.ToShopifyModel());
+                discounts.Add(ToLiquidDiscount(order.Discount));
             }
 
             var taxLines = new List<Objects.TaxLine>();
@@ -87,7 +98,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
 
             if (order.Shipments != null)
             {
-                result.ShippingMethods = order.Shipments.Select(s => s.ToShopifyModel()).ToArray();
+                result.ShippingMethods = order.Shipments.Select(s => ToLiquidShippingMethod(s)).ToArray();
                 result.ShippingPrice = result.ShippingMethods.Sum(s => s.Price);
                 result.ShippingPriceWithTax = result.ShippingMethods.Sum(s => s.PriceWithTax);
 
@@ -105,86 +116,59 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
                         result.FulfillmentStatus = orderShipment.Status;
                         result.FulfillmentStatusLabel = orderShipment.Status;
                     }
-
-                    if (orderShipment.TaxIncluded == true && orderShipment.Sum.Amount > 0)
-                    {
-                        taxLines.Add(new Objects.TaxLine { Title = "Shipping tax", Price = orderShipment.Tax.Amount * 100, Rate = orderShipment.Tax.Amount / (orderShipment.Sum.Amount + orderShipment.DiscountAmount.Amount)});
-                    }
                 }
 
-                var shipmentsWithTax = order.Shipments
-                    .Where(s => s.Tax.Amount > 0 && s.Sum.Amount > 0)
-                    .ToList();
-
-                if (shipmentsWithTax.Count > 0)
+                if (order.ShippingTaxTotal.Amount > 0)
                 {
                     taxLines.Add(new Objects.TaxLine
                     {
                         Title = "Shipping",
-                        Price = shipmentsWithTax.Sum(s => s.Tax.Amount) * 100,
-                        Rate = shipmentsWithTax.Sum(s => s.Tax.Amount) / shipmentsWithTax.Sum(s => (s.Sum + s.DiscountAmount).Amount)
+                        Price = order.ShippingTaxTotal.Amount * 100,
+                        Rate = order.Shipments.Average(s => s.TaxPercentRate)
                     });
                 }
-
-                var shipmentsWithDiscount = order.Shipments
-                    .Where(s => s.DiscountAmount.Amount > 0)
-                    .ToList();
-
-                if (shipmentsWithDiscount.Any())
+                if (order.ShippingDiscountTotal.Amount > 0)
                 {
-                    var shipmentDiscount = shipmentsWithDiscount.Sum(s => s.DiscountAmount.Amount);
-                    discountTotal += shipmentDiscount;
-
                     discounts.Add(new Discount
                     {
                         Type = "ShippingDiscount",
                         Code = "Shipping",
-                        Amount = shipmentDiscount * 100,
+                        Amount = order.ShippingDiscountTotal.Amount * 100,
                     });
                 }
             }
 
             if (order.Items != null)
             {
-                result.LineItems = order.Items.Select(i => i.ToShopifyModel(urlBuilder)).ToArray();
-                result.SubtotalPrice = order.Items.Sum(i => i.BasePrice.Amount * i.Quantity ?? 0) * 100;
-                result.SubtotalPriceWithTax = order.Items.Sum(i => i.BasePriceWithTax.Amount * i.Quantity ?? 0) * 100;
+                result.LineItems = order.Items.Select(i => ToLiquidLineItem(i, language, urlBuilder)).ToArray();
+                result.SubtotalPrice = order.SubTotal.Amount * 100;
+                result.SubtotalPriceWithTax = order.SubTotalWithTax.Amount * 100;
 
-                var itemsWithTax = order.Items
-                    .Where(i => i.Tax.Amount > 0m)
-                    .ToList();
-
-                if (itemsWithTax.Any() && order.SubTotal.Amount > 0)
+                if (order.SubTotalTaxTotal.Amount > 0)
                 {
                     taxLines.Add(new Objects.TaxLine
                     {
                         Title = "Line items",
-                        Price = itemsWithTax.Sum(i => i.Tax.Amount * 100),
-                        Rate = itemsWithTax.Sum(i => i.Tax.Amount) / order.SubTotal.Amount
-                    });
-                }
-
-                var itemsWithDiscount = order.Items
-                    .Where(i => i.DiscountAmount.Amount > 0m)
-                    .ToList();
-
-                if (itemsWithDiscount.Any())
-                {
-                    var itemsDiscount = itemsWithDiscount.Sum(i => i.DiscountAmount.Amount);
-                    discountTotal += itemsDiscount;
-
-                    discounts.Add(new Discount
-                    {
-                        Type = "FixedAmountDiscount",
-                        Code = "Items",
-                        Amount = itemsDiscount * 100,
+                        Price = order.SubTotalTaxTotal.Amount * 100,
+                        Rate = order.Items.Average(i => i.TaxPercentRate)
                     });
                 }
             }
 
-            if(!order.InPayments.IsNullOrEmpty())
+
+            if (order.DiscountAmount.Amount > 0)
             {
-                result.Transactions = order.InPayments.Select(x => x.ToShopifyModel()).ToArray();
+                discounts.Add(new Discount
+                {
+                    Type = "Order subtotal",
+                    Code = "Order",
+                    Amount = order.DiscountAmount.Amount * 100
+                });
+            }
+
+            if (!order.InPayments.IsNullOrEmpty())
+            {
+                result.Transactions = order.InPayments.Select(x => ToLiquidTransaction(x)).ToArray();
             }
 
             result.TaxLines = taxLines.ToArray();
@@ -192,7 +176,7 @@ namespace VirtoCommerce.LiquidThemeEngine.Converters
 
             result.Discounts = discounts.ToArray();
 
-            result.TotalPrice = order.Sum.Amount * 100;
+            result.TotalPrice = order.Total.Amount * 100;
 
             return result;
         }
